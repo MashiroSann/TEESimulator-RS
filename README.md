@@ -13,6 +13,15 @@
 > [!NOTE]
 > This is a fork of [JingMatrix/TEESimulator](https://github.com/JingMatrix/TEESimulator). It adds certificate generation written in Rust, generated keys that survive reboots, and attestation behavior that matches stock Android. See the upstream repo for the original project.
 
+## Changes in this fork
+
+Beyond upstream, this fork makes the simulator answer like real KeyMint hardware when an app probes for a fake security chip:
+
+- **Mixed-purpose attest keys are rejected.** A `generateKey` request that combines `ATTEST_KEY` with any other purpose now fails with `INCOMPATIBLE_PURPOSE` (`-3`), exactly as real hardware does. Upstream created the key instead.
+- **Deliberate errors keep their real code.** A rejection raised inside the simulator is returned with the KeyMint error code a real chip would answer with, instead of being collapsed to `SECURE_HW_COMMUNICATION_FAILED` (`-49`).
+- **Error names and fallbacks match AOSP.** The codes and text answered to apps were corrected against the official KeyMint `ErrorCode` AIDL table.
+- **RSA-OAEP MGF1 follows the spec.** An operation that omits the MGF1 digest defaults to SHA-1 and is rejected with `INCOMPATIBLE_MGF_DIGEST` (`-78`) when the key authorizes a different digest set, and `Digest.NONE` is rejected with `UNSUPPORTED_MGF_DIGEST` (`-79`). For real hardware keys, the key's allowed MGF1 digests are cached when it is generated and the same rules are applied to its operations, so a loose vendor implementation cannot be told apart from a strict one.
+
 ## What it does
 
 Some Android apps refuse to run on a rooted phone. They ask the phone to prove it still has a genuine security chip, a check called hardware attestation. A rooted phone normally fails that check.
@@ -130,7 +139,14 @@ cd TEESimulator-RS
 ./gradlew zipRelease zipDebug
 ```
 
-The ZIPs land in `out/`. Gradle runs `cargo ndk` for you to cross-compile `libcertgen.so`. To build on CI instead, push to `main` or run Actions > Build > Run workflow.
+The ZIPs land in `out/`. Gradle runs `cargo ndk` for you to cross-compile `libcertgen.so`, and native libraries are built for `arm64-v8a` only. To build on CI instead, push to `main` or run Actions > Build > Run workflow.
+
+On Windows, `build-module.ps1` pins the JDK, SDK, NDK, and Rust toolchain paths and runs the same build:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-module.ps1              # Release + Debug
+powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -ReleaseOnly # Release only
+```
 
 ## Compatibility
 
