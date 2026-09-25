@@ -7,6 +7,7 @@ import android.hardware.security.keymint.EcCurve
 import android.hardware.security.keymint.KeyOrigin
 import android.hardware.security.keymint.KeyParameter
 import android.hardware.security.keymint.KeyParameterValue
+import android.hardware.security.keymint.KeyPurpose
 import android.hardware.security.keymint.SecurityLevel
 import android.hardware.security.keymint.Tag
 import android.os.IBinder
@@ -141,6 +142,7 @@ class KeyMintSecurityLevelInterceptor(
                 GeneratedKeyPersistence.delete(keyId)
             }
             teeResponses.remove(keyId)
+            realRsaMgfKeysByAlias.remove(keyId)?.let { realRsaMgfKeys.remove(it.nspace) }
             patchedChains.remove(keyId)
             attestationKeys.remove(keyId)
             importedKeys.add(keyId)
@@ -234,6 +236,10 @@ class KeyMintSecurityLevelInterceptor(
                     ?: return TransactionResult.SkipTransaction
             val keyId = KeyIdentifier(callingUid, keyDescriptor.alias)
 
+            data.readTypedObject(KeyDescriptor.CREATOR) // skip attestationKey
+            val keyParams = data.createTypedArray(KeyParameter.CREATOR)
+            cacheRealRsaMgfKey(callingUid, keyDescriptor, metadata, keyParams)
+
             val originalChain = CertificateHelper.getCertificateChain(metadata)
             if (originalChain == null || originalChain.size <= 1) {
                 // Cache non-attested responses for KEY_ID getKeyEntry parity.
@@ -249,8 +255,6 @@ class KeyMintSecurityLevelInterceptor(
                 return TransactionResult.SkipTransaction
             }
 
-            data.readTypedObject(KeyDescriptor.CREATOR) // skip attestationKey
-            val keyParams = data.createTypedArray(KeyParameter.CREATOR)
             val certNotBefore =
                 keyParams
                     ?.find { it.tag == Tag.CERTIFICATE_NOT_BEFORE }
@@ -336,6 +340,48 @@ class KeyMintSecurityLevelInterceptor(
         return null
     }
 
+    private fun cacheRealRsaMgfKey(
+        callingUid: Int,
+        keyDescriptor: KeyDescriptor,
+        metadata: KeyMetadata,
+        keyParams: Array<KeyParameter>?,
+    ) {
+        if (keyParams == null) return
+        val parsed = runCatching { KeyMintAttestation(keyParams) }.getOrNull() ?: return
+        if (parsed.algorithm != Algorithm.RSA || parsed.rsaOaepMgfDigest.isEmpty()) return
+        val nspace = metadata.key?.nspace ?: 0L
+        if (nspace != 0L) {
+            if (realRsaMgfKeys.size > REAL_RSA_MGF_CACHE_LIMIT) realRsaMgfKeys.clear()
+            realRsaMgfKeys[nspace] = RealRsaMgfKey(nspace, parsed)
+        }
+        keyDescriptor.alias?.let { alias ->
+            if (realRsaMgfKeysByAlias.size > REAL_RSA_MGF_CACHE_LIMIT) realRsaMgfKeysByAlias.clear()
+            realRsaMgfKeysByAlias[KeyIdentifier(callingUid, alias)] =
+                RealRsaMgfKey(nspace, parsed)
+        }
+    }
+
+    private fun enforceRealRsaMgfDigest(
+        txId: Long,
+        callingUid: Int,
+        alias: String?,
+        nspace: Long?,
+        data: Parcel,
+    ): TransactionResult? {
+        val cached =
+            nspace?.takeIf { it != 0L }?.let { realRsaMgfKeys[it] }
+                ?: alias?.let { realRsaMgfKeysByAlias[KeyIdentifier(callingUid, it)] }
+                ?: return null
+        val params = data.createTypedArray(KeyParameter.CREATOR) ?: return null
+        val opParams = KeyMintAttestation(params)
+        val code = AuthorizeCreate.checkRsaOaepMgfDigest(cached.params, opParams) ?: return null
+        SystemLogger.info(
+            "[TX_ID: $txId] Real-key RSA-OAEP MGF1 rejection code=$code " +
+                "(uid=$callingUid alias=$alias nspace=${nspace ?: cached.nspace})"
+        )
+        return InterceptorUtils.createServiceSpecificErrorReply(code)
+    }
+
     private fun handleCreateOperation(
         txId: Long,
         callingUid: Int,
@@ -369,6 +415,10 @@ class KeyMintSecurityLevelInterceptor(
                             val key = KeyIdentifier(callingUid, alias)
                             generatedKeys[key]?.let { java.util.AbstractMap.SimpleEntry(key, it) }
                                 ?: run {
+                                    enforceRealRsaMgfDigest(txId, callingUid, alias, null, data)
+                                        ?.let {
+                                            return it
+                                        }
                                     SystemLogger.info(
                                         "[TX_ID: $txId] createOperation alias=$alias not in generatedKeys, forwarding to HAL"
                                     )
@@ -388,6 +438,10 @@ class KeyMintSecurityLevelInterceptor(
                                     trackAndEnforceOpLimit(callingUid, txId)?.let {
                                         return it
                                     }
+                                    enforceRealRsaMgfDigest(txId, callingUid, null, nspace, data)
+                                        ?.let {
+                                            return it
+                                        }
                                     SystemLogger.info(
                                         "[TX_ID: $txId] createOperation KeyId(${keyDescriptor.nspace}) NOT FOUND for uid=$callingUid. Forwarding to HAL."
                                     )
@@ -620,6 +674,23 @@ class KeyMintSecurityLevelInterceptor(
                     )
                 }
 
+                // Real KeyMint rejects PURPOSE_ATTEST_KEY combined with any other purpose with
+                // INCOMPATIBLE_PURPOSE; only a standalone attest key is a valid request. The forge
+                // path has no such gate, so a SIGN|ATTEST_KEY request used to mint a synthetic key
+                // here while real silicon answers -3. Mirror the hardware gate before any
+                // dispatch/skip decision so every caller, targeted or not, gets the genuine reply.
+                if (
+                    parsedParams.purpose.contains(KeyPurpose.ATTEST_KEY) &&
+                        parsedParams.purpose.size > 1
+                ) {
+                    SystemLogger.warning(
+                        "[TX_ID: $txId] Rejecting PURPOSE_ATTEST_KEY mixed with other purposes: " +
+                            parsedParams.purpose
+                    )
+                    logProbe("REJECT:incompatible_purpose")
+                    return InterceptorUtils.createErrorReply(KeystoreErrorCodes.incompatiblePurpose)
+                }
+
                 // Device-ID attestation (IMEI/MEID/serial) is a factory-provisioned capability the
                 // real TEE frequently cannot satisfy (it returns CANNOT_ATTEST_IDS). A privileged
                 // caller — shell/system, e.g. the Key Attestation app via Shizuku — is entitled to
@@ -770,7 +841,14 @@ class KeyMintSecurityLevelInterceptor(
                 // keybox) would otherwise leave no per-UID record. Pair this with the preceding
                 // `dispatch` line to see which request failed and why.
                 SystemLogger.uidLog(callingUid, txId, "forge-fail") { "ex=${ex.message}" }
-                InterceptorUtils.createServiceSpecificErrorReply(SECURE_HW_COMMUNICATION_FAILED)
+                // Deliberate ServiceSpecificExceptions (INVALID_ARGUMENT, CANNOT_ATTEST_IDS, ...)
+                // carry the same ErrorCode a real HAL would answer with; flattening every failure
+                // to -49 is exactly the simulator tell the TEE-forgery probes key on. Pass the
+                // code through and keep -49 only for failures with no hardware-style code.
+                val errorCode =
+                    (ex as? android.os.ServiceSpecificException)?.errorCode
+                        ?: SECURE_HW_COMMUNICATION_FAILED
+                InterceptorUtils.createServiceSpecificErrorReply(errorCode)
             }
     }
 
@@ -1505,7 +1583,7 @@ class KeyMintSecurityLevelInterceptor(
         private const val STRONGBOX_KEYGEN_LATENCY_FLOOR_MS = 250L
         private const val STRONGBOX_OP_LATENCY_FLOOR_MS = 80L
         private const val TEE_OP_LATENCY_FLOOR_MS = 4L
-        private const val KEYMINT_TOO_MANY_OPERATIONS = -29
+        private const val KEYMINT_TOO_MANY_OPERATIONS = -31
         private const val KEYMINT_CANNOT_ATTEST_IDS = -66
         private const val KEYMINT_UNKNOWN_ERROR = -1000
         private const val SECURE_HW_COMMUNICATION_FAILED = -49
@@ -1553,6 +1631,19 @@ class KeyMintSecurityLevelInterceptor(
         val generatedKeys = ConcurrentHashMap<KeyIdentifier, GeneratedKeyInfo>()
         val teeResponses = ConcurrentHashMap<KeyIdentifier, KeyEntryResponse>()
         val patchedChains = ConcurrentHashMap<KeyIdentifier, Array<Certificate>>()
+
+        /**
+         * Real (forwarded) RSA-OAEP keys seen at generateKey, keyed by namespace and by alias. The
+         * AOSP Tag::RSA_OAEP_MGF_DIGEST contract makes begin() without an MGF1 digest default to
+         * SHA-1 and requires it to be in the key's authorized set; a vendor HAL that accepts such a
+         * begin() diverges from that contract, so the rejection a compliant HAL performs is
+         * synthesized for keys the module does not forge itself.
+         */
+        data class RealRsaMgfKey(val nspace: Long, val params: KeyMintAttestation)
+
+        private val realRsaMgfKeys = ConcurrentHashMap<Long, RealRsaMgfKey>()
+        private val realRsaMgfKeysByAlias = ConcurrentHashMap<KeyIdentifier, RealRsaMgfKey>()
+        private const val REAL_RSA_MGF_CACHE_LIMIT = 1024
         val attestationKeys: MutableSet<KeyIdentifier> = ConcurrentHashMap.newKeySet()
         val importedKeys: MutableSet<KeyIdentifier> = ConcurrentHashMap.newKeySet()
         private val usageCounters =

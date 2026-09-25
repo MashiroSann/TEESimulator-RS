@@ -196,7 +196,7 @@ object CertificateGenerator {
             matched
                 ?: KeyBoxManager.getAnyAttestationKey(keyboxFile)
                 ?: throw android.os.ServiceSpecificException(
-                    -75, // ATTESTATION_KEYS_NOT_PROVISIONED
+                    -74, // ATTESTATION_KEYS_NOT_PROVISIONED
                     "No usable attestation key in $keyboxFile",
                 )
         // Surface which keybox actually signs the forge, so an EC-only-keybox fallback (an RSA leaf

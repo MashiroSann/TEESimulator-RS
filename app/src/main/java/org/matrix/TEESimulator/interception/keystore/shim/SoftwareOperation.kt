@@ -556,7 +556,7 @@ internal object KeystoreErrorCodes {
     }
 
     val invalidTag: Int by lazy {
-        resolveField("android.hardware.security.keymint.ErrorCode", "INVALID_TAG", -76)
+        resolveField("android.hardware.security.keymint.ErrorCode", "INVALID_TAG", -40)
     }
 
     val verificationFailed: Int by lazy {
@@ -576,23 +576,23 @@ internal object KeystoreErrorCodes {
     }
 
     val incompatiblePurpose: Int by lazy {
-        resolveField("android.hardware.security.keymint.ErrorCode", "INCOMPATIBLE_PURPOSE", -13)
+        resolveField("android.hardware.security.keymint.ErrorCode", "INCOMPATIBLE_PURPOSE", -3)
     }
 
     val unsupportedPurpose: Int by lazy {
-        resolveField("android.hardware.security.keymint.ErrorCode", "UNSUPPORTED_PURPOSE", -14)
+        resolveField("android.hardware.security.keymint.ErrorCode", "UNSUPPORTED_PURPOSE", -2)
     }
 
     val incompatibleAlgorithm: Int by lazy {
-        resolveField("android.hardware.security.keymint.ErrorCode", "INCOMPATIBLE_ALGORITHM", -18)
+        resolveField("android.hardware.security.keymint.ErrorCode", "INCOMPATIBLE_ALGORITHM", -5)
     }
 
     val keyNotYetValid: Int by lazy {
-        resolveField("android.hardware.security.keymint.ErrorCode", "KEY_NOT_YET_VALID", -39)
+        resolveField("android.hardware.security.keymint.ErrorCode", "KEY_NOT_YET_VALID", -24)
     }
 
     val keyExpired: Int by lazy {
-        resolveField("android.hardware.security.keymint.ErrorCode", "KEY_EXPIRED", -40)
+        resolveField("android.hardware.security.keymint.ErrorCode", "KEY_EXPIRED", -25)
     }
 
     val callerNonceProhibited: Int by lazy {
@@ -613,6 +613,14 @@ internal object KeystoreErrorCodes {
 
     val incompatibleDigest: Int by lazy {
         resolveField("android.hardware.security.keymint.ErrorCode", "INCOMPATIBLE_DIGEST", -13)
+    }
+
+    val incompatibleMgfDigest: Int by lazy {
+        resolveField("android.hardware.security.keymint.ErrorCode", "INCOMPATIBLE_MGF_DIGEST", -78)
+    }
+
+    val unsupportedMgfDigest: Int by lazy {
+        resolveField("android.hardware.security.keymint.ErrorCode", "UNSUPPORTED_MGF_DIGEST", -79)
     }
 
     val invalidMacLength: Int by lazy {

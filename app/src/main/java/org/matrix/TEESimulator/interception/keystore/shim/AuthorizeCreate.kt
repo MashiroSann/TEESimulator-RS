@@ -2,6 +2,7 @@ package org.matrix.TEESimulator.interception.keystore.shim
 
 import android.hardware.security.keymint.Algorithm
 import android.hardware.security.keymint.BlockMode
+import android.hardware.security.keymint.Digest
 import android.hardware.security.keymint.KeyParameter
 import android.hardware.security.keymint.KeyPurpose
 import android.hardware.security.keymint.PaddingMode
@@ -57,8 +58,8 @@ object AuthorizeCreate {
         if (opParams.digest.any { it !in keyParams.digest }) {
             return KeystoreErrorCodes.incompatibleDigest
         }
-        if (opParams.rsaOaepMgfDigest.any { it !in keyParams.rsaOaepMgfDigest }) {
-            return KeystoreErrorCodes.incompatibleDigest
+        checkRsaOaepMgfDigest(keyParams, opParams)?.let {
+            return it
         }
 
         if (keyParams.algorithm == Algorithm.AES && opParams.blockMode.contains(BlockMode.GCM)) {
@@ -81,6 +82,31 @@ object AuthorizeCreate {
             return KeystoreErrorCodes.incompatibleDigest
         }
 
+        return null
+    }
+
+    /**
+     * AOSP Tag::RSA_OAEP_MGF_DIGEST semantics: an explicit begin() MGF1 digest must be present in
+     * the key's authorized set (else INCOMPATIBLE_MGF_DIGEST), and Digest.NONE is never usable
+     * (UNSUPPORTED_MGF_DIGEST). An omitted begin() MGF1 digest defaults to SHA-1, which must then be
+     * part of the key's explicitly authorized set (else INCOMPATIBLE_MGF_DIGEST).
+     */
+    fun checkRsaOaepMgfDigest(
+        keyParams: KeyMintAttestation,
+        opParams: KeyMintAttestation,
+    ): Int? {
+        if (keyParams.algorithm != Algorithm.RSA) return null
+        if (!opParams.padding.contains(PaddingMode.RSA_OAEP)) return null
+        val keyMgf = keyParams.rsaOaepMgfDigest
+        val opMgf = opParams.rsaOaepMgfDigest
+        if (opMgf.contains(Digest.NONE)) return KeystoreErrorCodes.unsupportedMgfDigest
+        if (opMgf.isEmpty()) {
+            if (keyMgf.isNotEmpty() && !keyMgf.contains(Digest.SHA1)) {
+                return KeystoreErrorCodes.incompatibleMgfDigest
+            }
+            return null
+        }
+        if (opMgf.any { it !in keyMgf }) return KeystoreErrorCodes.incompatibleMgfDigest
         return null
     }
 

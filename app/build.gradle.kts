@@ -51,6 +51,7 @@ android {
         targetSdk = 36
         versionCode = gitCommitCount
         versionName = verName
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     buildTypes {
