@@ -347,17 +347,27 @@ class KeyMintSecurityLevelInterceptor(
         keyParams: Array<KeyParameter>?,
     ) {
         if (keyParams == null) return
-        val parsed = runCatching { KeyMintAttestation(keyParams) }.getOrNull() ?: return
-        if (parsed.algorithm != Algorithm.RSA || parsed.rsaOaepMgfDigest.isEmpty()) return
+        val alias = keyDescriptor.alias
+        val parsed = runCatching { KeyMintAttestation(keyParams) }.getOrNull()
+        if (parsed == null || parsed.algorithm != Algorithm.RSA || parsed.rsaOaepMgfDigest.isEmpty()) {
+            // The alias was (re)generated without an explicit MGF1 authorization: drop any stale
+            // entry so the previous key's digest set never leaks onto the new key.
+            alias?.let {
+                realRsaMgfKeysByAlias.remove(KeyIdentifier(callingUid, it))?.let { stale ->
+                    realRsaMgfKeys.remove(stale.nspace)
+                }
+            }
+            return
+        }
         val nspace = metadata.key?.nspace ?: 0L
         if (nspace != 0L) {
             if (realRsaMgfKeys.size > REAL_RSA_MGF_CACHE_LIMIT) realRsaMgfKeys.clear()
-            realRsaMgfKeys[nspace] = RealRsaMgfKey(nspace, parsed)
+            realRsaMgfKeys[nspace] = RealRsaMgfKey(callingUid, nspace, parsed)
         }
-        keyDescriptor.alias?.let { alias ->
+        alias?.let {
             if (realRsaMgfKeysByAlias.size > REAL_RSA_MGF_CACHE_LIMIT) realRsaMgfKeysByAlias.clear()
-            realRsaMgfKeysByAlias[KeyIdentifier(callingUid, alias)] =
-                RealRsaMgfKey(nspace, parsed)
+            realRsaMgfKeysByAlias[KeyIdentifier(callingUid, it)] =
+                RealRsaMgfKey(callingUid, nspace, parsed)
         }
     }
 
@@ -367,20 +377,28 @@ class KeyMintSecurityLevelInterceptor(
         alias: String?,
         nspace: Long?,
         data: Parcel,
-    ): TransactionResult? {
-        val cached =
-            nspace?.takeIf { it != 0L }?.let { realRsaMgfKeys[it] }
-                ?: alias?.let { realRsaMgfKeysByAlias[KeyIdentifier(callingUid, it)] }
-                ?: return null
-        val params = data.createTypedArray(KeyParameter.CREATOR) ?: return null
-        val opParams = KeyMintAttestation(params)
-        val code = AuthorizeCreate.checkRsaOaepMgfDigest(cached.params, opParams) ?: return null
-        SystemLogger.info(
-            "[TX_ID: $txId] Real-key RSA-OAEP MGF1 rejection code=$code " +
-                "(uid=$callingUid alias=$alias nspace=${nspace ?: cached.nspace})"
-        )
-        return InterceptorUtils.createServiceSpecificErrorReply(code)
-    }
+    ): TransactionResult? =
+        // Fail open: any parsing problem here must forward the call to the real HAL, never turn
+        // into a synthetic error reply for an otherwise valid transaction.
+        runCatching {
+                val cached =
+                    nspace?.takeIf { it != 0L }
+                        ?.let { realRsaMgfKeys[it] }
+                        ?.takeIf { it.uid == callingUid }
+                        ?: alias?.let { realRsaMgfKeysByAlias[KeyIdentifier(callingUid, it)] }
+                        ?: return@runCatching null
+                val params = data.createTypedArray(KeyParameter.CREATOR) ?: return@runCatching null
+                val opParams = KeyMintAttestation(params)
+                val code =
+                    AuthorizeCreate.checkRsaOaepMgfDigest(cached.params, opParams)
+                        ?: return@runCatching null
+                SystemLogger.info(
+                    "[TX_ID: $txId] Real-key RSA-OAEP MGF1 rejection code=$code " +
+                        "(uid=$callingUid alias=$alias nspace=${nspace ?: cached.nspace})"
+                )
+                InterceptorUtils.createServiceSpecificErrorReply(code)
+            }
+            .getOrNull()
 
     private fun handleCreateOperation(
         txId: Long,
@@ -1639,7 +1657,7 @@ class KeyMintSecurityLevelInterceptor(
          * begin() diverges from that contract, so the rejection a compliant HAL performs is
          * synthesized for keys the module does not forge itself.
          */
-        data class RealRsaMgfKey(val nspace: Long, val params: KeyMintAttestation)
+        data class RealRsaMgfKey(val uid: Int, val nspace: Long, val params: KeyMintAttestation)
 
         private val realRsaMgfKeys = ConcurrentHashMap<Long, RealRsaMgfKey>()
         private val realRsaMgfKeysByAlias = ConcurrentHashMap<KeyIdentifier, RealRsaMgfKey>()

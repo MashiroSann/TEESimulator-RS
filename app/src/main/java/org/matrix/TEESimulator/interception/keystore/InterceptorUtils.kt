@@ -28,11 +28,17 @@ object InterceptorUtils {
 
     private fun synthesizeSseMessage(errorCode: Int): String =
         when (errorCode) {
-            2 -> "Error::Rc(SYSTEM_ERROR)"
-            4 -> "Error::Rc(PERMISSION_DENIED)"
-            6 -> "Error::Rc(VALUE_CORRUPTED)"
+            2 -> "Error::Rc(LOCKED)"
+            3 -> "Error::Rc(UNINITIALIZED)"
+            4 -> "Error::Rc(SYSTEM_ERROR)"
+            6 -> "Error::Rc(PERMISSION_DENIED)"
             7 -> "Error::Rc(KEY_NOT_FOUND)"
-            10 -> "Error::Rc(BACKEND_BUSY)"
+            8 -> "Error::Rc(VALUE_CORRUPTED)"
+            17 -> "Error::Rc(KEY_PERMANENTLY_INVALIDATED)"
+            18 -> "Error::Rc(BACKEND_BUSY)"
+            19 -> "Error::Rc(OPERATION_BUSY)"
+            20 -> "Error::Rc(INVALID_ARGUMENT)"
+            21 -> "Error::Rc(TOO_MUCH_DATA)"
             -2 -> "Error::Km(UNSUPPORTED_PURPOSE)"
             -3 -> "Error::Km(INCOMPATIBLE_PURPOSE)"
             -5 -> "Error::Km(INCOMPATIBLE_ALGORITHM)"

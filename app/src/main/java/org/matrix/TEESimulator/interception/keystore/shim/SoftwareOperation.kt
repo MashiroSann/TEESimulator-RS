@@ -537,7 +537,7 @@ class SoftwareOperation(
             is javax.crypto.IllegalBlockSizeException ->
                 ServiceSpecificException(KeystoreErrorCodes.invalidInputLength, e.message)
             is java.security.InvalidKeyException ->
-                ServiceSpecificException(KeystoreErrorCodes.incompatibleKey, e.message)
+                ServiceSpecificException(KeystoreErrorCodes.invalidArgument, e.message)
             else -> ServiceSpecificException(KeystoreErrorCodes.unknownError, e.message)
         }
 
@@ -569,10 +569,6 @@ internal object KeystoreErrorCodes {
 
     val invalidInputLength: Int by lazy {
         resolveField("android.hardware.security.keymint.ErrorCode", "INVALID_INPUT_LENGTH", -21)
-    }
-
-    val incompatibleKey: Int by lazy {
-        resolveField("android.hardware.security.keymint.ErrorCode", "INCOMPATIBLE_KEY", -31)
     }
 
     val incompatiblePurpose: Int by lazy {
