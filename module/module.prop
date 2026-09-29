@@ -4,4 +4,4 @@ version=${REPLACEMEVER}
 versionCode=${REPLACEMEVERCODE}
 author=JingMatrix, Enginex0
 description=Software simulation for Android hardware-backed key pairs with key attestation
-updateJson=https://raw.githubusercontent.com/Enginex0/TEESimulator-RS/main/module/update.json
+updateJson=https://raw.githubusercontent.com/MashiroSann/TEESimulator-RS/main/module/update.json
