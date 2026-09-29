@@ -93,8 +93,12 @@ object CertificateGenerator {
             )
 
         return try {
-            // AOSP ta/src/keys.rs:451-478: no challenge + no attestKey = self-signed, depth 1
-            if (challenge == null && attestKeyAlias == null) {
+            // AOSP ta/src/keys.rs:451-478: no challenge + no attestKey = self-signed, depth 1.
+            // Exception: a key whose sole purpose is ATTEST_KEY is issued by the device
+            // attestation key on real hardware — apps chain subject keys to it and verify the
+            // assembled chain against the Google root — so root it under the keybox instead of
+            // self-signing it (otherwise the app shows "unknown root certificate").
+            if (challenge == null && attestKeyAlias == null && !params.isAttestKey()) {
                 SystemLogger.trace {
                     "[certgen] no-challenge key: self-signed, depth=1, purposes=${params.purpose}"
                 }

@@ -62,18 +62,30 @@ fn generate_attested_inner(env: &mut JNIEnv, config: &JObject) -> Result<jbyteAr
 
     let keybox = keybox::parse_keybox(&params.keybox_cert_chain, &params.keybox_private_key)?;
 
-    let cert_chain = if params.attestation_challenge.is_some() {
-        let attest_ext = attestation::build_attestation_extension(&params)?;
+    // A key whose sole purpose is ATTEST_KEY is issued by the device attestation key even
+    // without a challenge: apps chain subject keys to it and verify the assembled chain
+    // against the Google root. AOSP's software TA self-signs it, but real TEEs root it, so
+    // emit the keybox chain instead of a self-signed leaf.
+    let is_attest_key = params.purposes.len() == 1 && params.purposes[0] == 7;
+
+    let cert_chain = if params.attestation_challenge.is_some() || is_attest_key {
+        let attest_ext = if params.attestation_challenge.is_some() {
+            Some(attestation::build_attestation_extension(&params)?)
+        } else {
+            None
+        };
         // Ground truth of what the Rust forger emitted, keyed to the app. Gated on the APK debug
         // variant so release builds never dump the extension.
         if params.debug_logging {
-            tracing::info!(
-                uid = params.uid,
-                ext_hex = %hex_encode(&attest_ext),
-                "produced attestation extension"
-            );
+            if let Some(ref ext) = attest_ext {
+                tracing::info!(
+                    uid = params.uid,
+                    ext_hex = %hex_encode(ext),
+                    "produced attestation extension"
+                );
+            }
         }
-        certbuilder::build_certificate_chain(&key_pair, Some(&attest_ext), &keybox, &params)?
+        certbuilder::build_certificate_chain(&key_pair, attest_ext.as_deref(), &keybox, &params)?
     } else {
         tracing::info!(
             uid = params.uid,

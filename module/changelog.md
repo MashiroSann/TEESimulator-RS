@@ -13,6 +13,8 @@ Tricky Addon merged into the module: the WebUI now ships inside the zip next to 
 - Sensitive-prop handling imported from Tricky Addon (`prop.sh`, opt out with `/data/adb/disable_prop_handler`), plus the TSupport-A target-list guard.
 - WebUI update checks now follow this fork's `module/update.json`; canary/nightly is disabled.
 - Windows `build-module.ps1` builds the WebUI (Node.js + pnpm, proxy-aware) before packaging; `-SkipWebui` reuses an existing `module\webroot`.
+- Fixed app attest-key chains: a key whose sole purpose is `PURPOSE_ATTEST_KEY` is now issued by the keybox even without an attestation challenge (real TEE behavior), instead of a self-signed certificate. Keys attested by an app-generated attest key chain to the Google root again — no more "unknown root certificate" and key-replacement detections.
+- If you already installed the earlier v6.0.1-312 build, reinstall this one manually: the versionCode is unchanged.
 
 ## TEESimulator-RS v6.0.1-307
 
