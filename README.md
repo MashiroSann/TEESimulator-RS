@@ -21,6 +21,7 @@ Beyond upstream, this fork makes the simulator answer like real KeyMint hardware
 - **Deliberate errors keep their real code.** A rejection raised inside the simulator is returned with the KeyMint error code a real chip would answer with, instead of being collapsed to `SECURE_HW_COMMUNICATION_FAILED` (`-49`).
 - **Error names and fallbacks match AOSP.** The codes and text answered to apps were corrected against the official KeyMint `ErrorCode` AIDL table.
 - **RSA-OAEP MGF1 follows the spec.** An operation that omits the MGF1 digest defaults to SHA-1 and is rejected with `INCOMPATIBLE_MGF_DIGEST` (`-78`) when the key authorizes a different digest set, and `Digest.NONE` is rejected with `UNSUPPORTED_MGF_DIGEST` (`-79`). For real hardware keys, the key's allowed MGF1 digests are cached when it is generated and the same rules are applied to its operations, so a loose vendor implementation cannot be told apart from a strict one.
+- **Bundled Tricky Addon WebUI.** The module now ships the [Tricky Addon](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) WebUI (upstream `cf16784`, v5.0-beta.4, Apache-2.0). Root managers that support module WebUIs (KernelSU, KernelSU Next, APatch) show it as a second button next to the Action button, served from `webroot/`: edit the target list, manage `keybox.xml` (AOSP / local file / community repo), and review security patch settings. The Action button keeps the original persistent-key management. The WebUI detects this fork and uses its `target.txt` + `security_patch.txt` layout, preserving per-package `[pkg]` patch sections on save.
 
 ## What it does
 
@@ -41,10 +42,10 @@ It replaces TrickyStore and its forks completely. It reads config from the same 
 
 ## Quick start
 
-1. Download the latest ZIP from [Releases](https://github.com/Enginex0/TEESimulator-RS/releases).
+1. Download the latest ZIP from [Releases](https://github.com/MashiroSann/TEESimulator-RS/releases).
 2. Install it with your root manager, then reboot.
 3. Put your `keybox.xml` at `/data/adb/tricky_store/keybox.xml`.
-4. List the apps you want to cover in `/data/adb/tricky_store/target.txt`.
+4. List the apps you want to cover in `/data/adb/tricky_store/target.txt` — or tap the module's Action button to open the bundled WebUI.
 5. Check that it works with Play Integrity or the Key Attestation Demo app.
 
 ## How it works
@@ -134,18 +135,20 @@ In `auto`, Oplus-family devices (OnePlus/OPPO/realme/Oplus) skip boot-state prop
 You need JDK 21, the Android SDK and NDK 29, Rust (stable) with the `aarch64-linux-android` target, and `cargo-ndk`.
 
 ```bash
-git clone --recursive https://github.com/Enginex0/TEESimulator-RS.git
+git clone --recursive https://github.com/MashiroSann/TEESimulator-RS.git
 cd TEESimulator-RS
+cd webui && pnpm install --frozen-lockfile && pnpm run build && cd ..   # emits module/webroot
 ./gradlew zipRelease zipDebug
 ```
 
-The ZIPs land in `out/`. Gradle runs `cargo ndk` for you to cross-compile `libcertgen.so`, and native libraries are built for `arm64-v8a` only. To build on CI instead, push to `main` or run Actions > Build > Run workflow.
+The ZIPs land in `out/`. Gradle runs `cargo ndk` for you to cross-compile `libcertgen.so`, and native libraries are built for `arm64-v8a` only. The bundled WebUI is a Vite/TypeScript app under `webui/` (Node.js 20+ and pnpm required); it must be built before packaging because `customize.sh` aborts when `webroot/index.html` is missing. To build on CI instead, push to `main` or run Actions > Build > Run workflow.
 
-On Windows, `build-module.ps1` pins the JDK, SDK, NDK, and Rust toolchain paths and runs the same build:
+On Windows, `build-module.ps1` pins the JDK, SDK, NDK, Rust and Node toolchain paths and runs the same build, including the WebUI:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build-module.ps1              # Release + Debug
 powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -ReleaseOnly # Release only
+powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -SkipWebui   # reuse module\webroot
 ```
 
 ## Compatibility
@@ -167,6 +170,7 @@ powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -ReleaseOnly # Relea
 ## Credits
 
 - [JingMatrix](https://github.com/JingMatrix/TEESimulator) for the original TEESimulator and its interception design
+- [KOWX712](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) for the Tricky Addon WebUI bundled with this fork (Apache-2.0)
 - [ring](https://github.com/briansmith/ring) for the Rust cryptography
 - [fatalcoder524](https://github.com/fatalcoder524) for contributions and collaboration
 - [huguangares](https://github.com/huguangares) for collaboration and testing

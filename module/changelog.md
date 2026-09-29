@@ -3,6 +3,17 @@
 
 ---
 
+## TEESimulator-RS v6.0.1-312
+
+Tricky Addon merged into the module: the WebUI now ships inside the zip next to the original Action button.
+
+- Bundled the [Tricky Addon](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) WebUI (upstream `cf16784`, v5.0-beta.4, Apache-2.0), served from `webroot/`. Root managers with WebUI support (KernelSU, KernelSU Next, APatch) show a WebUI button beside the Action button. Edit the target list, manage `keybox.xml` (AOSP / local file / community repo) and review security patch settings without installing a second module.
+- The Action button is unchanged: persistent-key management plus the debug-build log export.
+- The WebUI detects this fork and drives `target.txt` + `security_patch.txt`, preserving per-package `[pkg]` patch sections when the global policy is saved.
+- Sensitive-prop handling imported from Tricky Addon (`prop.sh`, opt out with `/data/adb/disable_prop_handler`), plus the TSupport-A target-list guard.
+- WebUI update checks now follow this fork's `module/update.json`; canary/nightly is disabled.
+- Windows `build-module.ps1` builds the WebUI (Node.js + pnpm, proxy-aware) before packaging; `-SkipWebui` reuses an existing `module\webroot`.
+
 ## TEESimulator-RS v6.0.1-307
 
 Fixes five gaps in the module's TEE key-operation and attestation emulation. Two of them fix crashes in real app crypto on a broken-TEE device: any app using an AndroidKeyStore HMAC key or an RSA-OAEP-SHA256 key was throwing. This is a beta; the confirmation logs are in the debug build only, and nothing is field-verified yet.

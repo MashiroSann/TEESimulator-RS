@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_default">النظام الافتراضي</string>
+    <string name="more_language">المزيد</string>
+    <!-- Header -->
+    <string name="header_title">Tricky Addon</string>
+    <!-- Help Menu-->
+    <string name="help_help_instructions">تعليمات</string>
+    <string name="help_save_and_update_description">حفظ التكوين الحالي.</string>
+    <string name="help_select_denylist">تحديد من قائمة الرفض</string>
+    <string name="help_select_denylist_description">متاح في Magisk فقط، حدد التطبيقات الموجودة في قائمة الرفض. موصى به.</string>
+    <string name="help_deselect_unnecessary">إلغاء تحديد غير الضروري</string>
+    <string name="help_deselect_unnecessary_description">**فئة غير ضرورية: وحدة Xposed، مدير الجذر، التطبيقات المتعلقة بالجذر، والتطبيقات العامة التي لا تتحقق أبدًا من حالة bootloader. يتطلب هذا الخيار اتصالاً بالإنترنت.</string>
+    <string name="help_add_system_app">إضافة تطبيق نظام</string>
+    <string name="help_add_system_app_description">إضافة تطبيق نظام محدد إلى قائمة التطبيقات.</string>
+    <string name="help_set_keybox">تعيين صندوق المفاتيح</string>
+    <string name="help_set_keybox_description">استبدال صندوق مفاتيح TrickyStore بما يلي:</string>
+    <string name="help_set_keybox_aosp">**AOSP** - صندوق المفاتيح الافتراضي الذي يأتي مع TrickyStore.</string>
+    <string name="help_set_keybox_unknown">**غير معروف** - توقيع ذاتي وغير صالح لنظام Play Integrity</string>
+    <string name="help_set_keybox_local">**محلي** - حدد صندوق المفاتيح من جهازك.</string>
+    <string name="help_set_keybox_custom">**مخصص** - موفر صندوق المفاتيح المخصص من خلال التحميل من الإنترنت</string>
+    <string name="help_set_default_policy">تعيين السياسة الافتراضية</string>
+    <string name="help_set_default_policy_description">سابقاً، \"تعيين تاريخ اصدار الحماية`. سياسة الإعداد الافتراضية لجميع التطبيقات المستهدفة، اتركه فارغاً أو \"لا\" للتعطيل، \"prop\" للتوافق مع ملف مواصفات النظام</string>
+    <string name="help_prop_settings">إعدادات ملف مواصفات النظام</string>
+    <string name="help_prop_settings_description">إعدادات مختلفة ذات صلة بملف المواصفات:</string>
+    <string name="help_prop_settings_handler">**معالج ملف المواصفات** - تبديل سكريبت إعادة تعيين الشميكو.</string>
+    <string name="help_prop_settings_boot_hash">**Boot hash** - احصل على قيمة `verifiedBootHash\' من [KeyAttestation](https://github.com/vvb2060/KeyAttestation/releases). إصلاح حالة التمهيد غير الطبيعي عن طريق إعادة تعيين `ro.boot.vbmeta.digest`.</string>
+    <!-- Update -->
+    <string name="update_update_available">إصدار جديد جاهز</string>
+    <string name="update_redirect_to_release">اضغط لتنزيل أحدث إصدار</string>
+    <string name="update_changelog">سجل التغييرات</string>
+    <string name="update_install">تثبيت</string>
+    <string name="update_reboot">إعادة تشغيل</string>
+    <string name="update_channel">قناة التحديث</string>
+    <string name="update_channel_stable">مستقر</string>
+    <string name="update_channel_canary">تجريبي</string>
+    <string name="update_channel_disable">تعطيل</string>
+    <!-- Search -->
+    <string name="search_bar_search_placeholder">بحث</string>
+    <!-- Functional Button -->
+    <string name="functional_button_save">حفظ</string>
+    <string name="functional_button_uninstall_webui">إلغاء تثبيت WebUI</string>
+    <string name="functional_button_close">غلق</string>
+    <string name="functional_button_cancel">إلغاء</string>
+    <string name="functional_button_confirm">تأكيد</string>
+    <string name="functional_button_reset">إعادة الضبط</string>
+    <string name="functional_button_remove">حذف</string>
+    <string name="functional_button_today">اليوم</string>
+    <!-- Menu -->
+    <string name="menu_select_denylist">تحديد من قائمة الرفض</string>
+    <string name="menu_deselect_unnecessary">إلغاء تحديد غير الضروري</string>
+    <string name="menu_add_system_app">إضافة تطبيق نظام</string>
+    <string name="menu_keybox">صندوق مفاتيح</string>
+    <string name="menu_keybox_aosp">AOSP</string>
+    <string name="menu_keybox_unknown">غير معروف</string>
+    <string name="menu_keybox_local">محلي</string>
+    <string name="menu_keybox_repo">المستودع</string>
+    <string name="menu_prop_setting">إعدادات ملف المواصفات</string>
+    <string name="menu_set_default_policy">تعيين السياسة الافتراضية</string>
+    <string name="menu_help">المساعدة</string>
+    <string name="menu_language">اللغة</string>
+    <string name="menu_about">حول</string>
+    <!-- Prop Dialog -->
+    <string name="prop_handler">معالج ملف المواصفات</string>
+    <string name="boot_hash_title">تجزئة التمهيد</string>
+    <!-- About -->
+    <string name="about_module_name_line1">Tricky Addon</string>
+    <string name="about_module_name_line2">تحديث قائمة الأهداف</string>
+    <string name="about_by">بواسطة</string>
+    <string name="about_telegram_channel">قناة التليجرام</string>
+    <string name="about_canary_update">تحديث إلى أحدث إصدار تجريبي</string>
+    <string name="about_translation_update">تحديث حزمة ملفات الترجمة</string>
+    <string name="about_disclaimer">هذه الوحدة ليست جزءًا من وحدة Tricky Store. لا تقم بالإبلاغ عن أي مشاكل إلى Tricky Store إذا واجهت أيًا منها.</string>
+    <string name="about_acknowledgment">شكر وتقدير</string>
+    <!-- Prompt -->
+    <string name="prompt_aosp_key_set">تم تعيين keybox AOSP بنجاح</string>
+    <string name="prompt_key_set_error">فشل في تحديث keybox</string>
+    <string name="prompt_unknown_key_set">تم تعيين Keybox غير معروف بنجاح</string>
+    <string name="prompt_boot_hash_set">تم حفظ تجزئة التمهيد الموثوق بنجاح</string>
+    <string name="prompt_boot_hash_set_error">فشل في تحديث تجزئة التمهيد الموثوق</string>
+    <string name="prompt_saved_target">تم حفظ الإعدادات</string>
+    <string name="prompt_save_error">فشل في حفظ التكوين</string>
+    <string name="prompt_uninstall_prompt">سيتم إزالة WebUI بعد إعادة التشغيل</string>
+    <string name="prompt_uninstall_failed">فشل في إلغاء تثبيت WebUI</string>
+    <string name="prompt_checking_update">جار التحقق من التحديثات...</string>
+    <string name="prompt_new_update">تحديث جديد متاح!</string>
+    <string name="prompt_no_update">لا توجد تحديثات متوفرة حاليا</string>
+    <string name="prompt_downloading">جارٍ تنزيل التحديث الجديد...</string>
+    <string name="prompt_download_fail">فشل في تنزيل التحديث</string>
+    <string name="prompt_installed">تم التثبيت بنجاح، أعد التشغيل الآن.</string>
+    <string name="prompt_install_fail">فشل في التثبيت، يرجى التحديث يدويًا</string>
+    <string name="prompt_rebooting">جارٍ إعادة التشغيل...</string>
+    <string name="prompt_reboot_fail">فشل في إعادة التشغيل، يرجى إعادة التشغيل يدويًا</string>
+    <string name="prompt_translation_updated">تم تحديث حزمة ملفات الترجمة</string>
+    <string name="prompt_translation_update_failed">فشل تحديث حزمة ملفات الترجمة</string>
+    <string name="prompt_custom_key_set">تم تعيين keybox مخصص بنجاح</string>
+    <string name="prompt_custom_key_set_error">فشل في تعيين keybox مخصص</string>
+    <string name="prompt_custom_saved">تم حفظ مدخل keybox مخصص</string>
+    <string name="prompt_custom_fetch_error">فشل الحصول على keybox</string>
+    <string name="prompt_custom_not_found">لم يتم العثور على keybox صالح</string>
+    <string name="prompt_custom_invalid_script">سكربت غير مقبول</string>
+    <string name="prompt_custom_removed">تم حذف مدخل keybox مخصص</string>
+    <string name="prompt_keybox_repo_set">تم تعيين صندوق المفاتيح من المستودع بنجاح</string>
+    <string name="prompt_keybox_repo_set_error">فشل في تعيين صندوق المفاتيح من المستودع</string>
+    <string name="prompt_keybox_repo_download_error">فشل تحميل %s</string>
+    <!-- Security Patch -->
+    <string name="default_policy_title">السياسة الافتراضية</string>
+    <string name="security_patch_invalid_all">تنسيق غير صالح</string>
+    <!-- Add System App -->
+    <string name="add_system_app_title">إضافة تطبيق نظام</string>
+    <!-- CustomKB Dialog -->
+    <string name="customkb_dialog_title">مزود الـkeybox المخصص</string>
+    <string name="customkb_name_placeholder">الاسم</string>
+    <string name="customkb_script_placeholder">سكربت فك التشفير</string>
+    <string name="customkb_export_success">تم استخراج مِلَفّ الإعداد في %s</string>
+    <string name="customkb_export_error">فشل استخراج مِلَفّ الإعداد</string>
+    <string name="customkb_export_empty">لا يوجد شئ لاستخراجه</string>
+    <string name="customkb_import_success">تم استيراد مِلَفّ الإعداد</string>
+    <string name="customkb_import_error">مِلَفّ إعداد غير صالح</string>
+    <string name="customkb_remove_title">تأكيد الحذف؟؟</string>
+    <string name="customkb_remove_message">حذف مزود الـkeybox المخصص؟</string>
+    <string name="customkb_reset_message">حذف جميع مزودي صندوق المفاتيح المخصص؟</string>
+    <!-- Uninstall confirmation -->
+    <string name="confirmation_uninstall_title">تأكيد إلغاء التثبيت؟</string>
+    <string name="confirmation_uninstall_message">هل أنت متأكد أنك تريد إلغاء تثبيت Tricky Addon</string>
+    <!-- Mode dialog -->
+    <string name="mode_dialog_title">الوضع</string>
+    <string name="mode_auto">تلقائي</string>
+    <string name="mode_certificate_generating">إنشاء شهادة</string>
+    <string name="mode_leaf_hack">حيلة الورق (Leaf Hack)</string>
+    <string name="mode_set_custom_policy">تعيين سياسة مخصصة</string>
+    <string name="mode_use_default_policy">استخدام السياسة الافتراضية</string>
+</resources>

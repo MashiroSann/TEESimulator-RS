@@ -48,7 +48,7 @@ install_file() {
 
 # --- Installation ---
 ui_print "- Extracting module files"
-for file in customize.sh module.prop service.sh sepolicy.rule daemon action.sh action_i18n.sh uninstall.sh; do
+for file in customize.sh module.prop service.sh sepolicy.rule daemon action.sh action_i18n.sh prop.sh uninstall.sh; do
   install_file "$file" "$MODPATH"
 done
 
@@ -62,6 +62,26 @@ else
 fi
 
 chmod 755 "$MODPATH/daemon"
+chmod 755 "$MODPATH/prop.sh"
+ui_print ""
+
+# Bundled Tricky Addon WebUI (built by `pnpm build` in webui/ before packaging).
+# KSUWebUIStandalone / WebUI X load <module>/webroot/index.html.
+mkdir -p "$MODPATH/webroot"
+unzip -qqo "$ZIPFILE" "webroot/*" -d "$MODPATH" 2>/dev/null
+if [ ! -f "$MODPATH/webroot/index.html" ]; then
+  abort "! WebUI payload missing from the zip (build webui/ before packaging)"
+fi
+chmod -R 755 "$MODPATH/webroot"
+ui_print "- Bundled WebUI extracted"
+
+# Tricky Addon support files: AOSP keybox blob + xposed scan backend.
+mkdir -p "$MODPATH/common"
+unzip -qqjo "$ZIPFILE" "common/.default" "common/get_extra.sh" -d "$MODPATH/common" 2>/dev/null
+if [ -f "$MODPATH/common/get_extra.sh" ]; then
+  chmod 755 "$MODPATH/common/get_extra.sh"
+fi
+ui_print "- Support files extracted"
 ui_print ""
 
 ui_print "- Extracting $ARCH libraries"

@@ -36,10 +36,14 @@ param(
     [switch]$Clean,
     [switch]$Daemon,
     [switch]$SkipFetch,
+    [switch]$SkipWebui,
+    [switch]$NoProxy,
     [string]$JdkHome    = 'G:\workenvironment\jdk-21',
     [string]$SdkRoot    = 'G:\workenvironment\android-sdk',
     [string]$RustRoot   = 'G:\workenvironment\rust',
-    [string]$GradleHome = 'G:\workenvironment\gradle-home'
+    [string]$GradleHome = 'G:\workenvironment\gradle-home',
+    [string]$NodeRoot   = 'G:\workenvironment\nodejs',
+    [string]$HttpProxy  = 'http://127.0.0.1:20721'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -66,8 +70,9 @@ $env:CARGO_HTTP_TIMEOUT          = '120'
 $env:CARGO_HTTP_LOW_SPEED_LIMIT  = '1'
 $env:CARGO_HTTP_MULTIPLEXING     = 'false'
 $env:CARGO_NET_RETRY             = '10'
-# 工具链置于 PATH 最前，避免命中其它位置的 rustup/cargo
-$env:Path = (Join-Path $env:CARGO_HOME 'bin') + ';' +
+# 工具链置于 PATH 最前，避免命中其它位置的 rustup/cargo/node
+$env:Path = $NodeRoot + ';' +
+            (Join-Path $env:CARGO_HOME 'bin') + ';' +
             (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:Path
 
 Say "项目根目录 : $projectRoot" 'Cyan'
@@ -93,6 +98,20 @@ foreach ($c in $checks) {
     } else {
         Say "  [X]  缺失 $($c.N)：$($c.P)" 'Red'
         $missing += $c.N
+    }
+}
+if (-not $SkipWebui) {
+    $webuiChecks = @(
+        @{ N = 'Node.js (webui)'; P = (Join-Path $NodeRoot 'node.exe') },
+        @{ N = 'pnpm (webui)';    P = (Join-Path $NodeRoot 'pnpm.cmd') }
+    )
+    foreach ($c in $webuiChecks) {
+        if (Test-Path -LiteralPath $c.P) {
+            Say "  [OK] $($c.N)"
+        } else {
+            Say "  [X]  缺失 $($c.N)：$($c.P)" 'Red'
+            $missing += $c.N
+        }
     }
 }
 if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'gradlew.bat'))) {
@@ -134,6 +153,34 @@ if (-not $SkipFetch) {
     }
     if ($LASTEXITCODE -ne 0) { throw "cargo fetch 失败（退出码 $LASTEXITCODE）" }
     Say '  [OK] Rust 依赖已就绪（后续构建不会再走 crates.io）'
+}
+
+# ============================ 2.5 WebUI 构建 ============================
+if (-not $SkipWebui) {
+    Say ''
+    Say '==== 构建 WebUI（Tricky Addon, vite）====' 'Cyan'
+    $webuiDir = Join-Path $projectRoot 'webui'
+    if (-not (Test-Path -LiteralPath (Join-Path $webuiDir 'package.json'))) {
+        throw '找不到 webui\package.json（-SkipWebui 可跳过 WebUI 构建）'
+    }
+    Push-Location $webuiDir
+    $oldHttp = $env:HTTP_PROXY; $oldHttps = $env:HTTPS_PROXY
+    if (-not $NoProxy) { $env:HTTP_PROXY = $HttpProxy; $env:HTTPS_PROXY = $HttpProxy }
+    try {
+        & (Join-Path $NodeRoot 'pnpm.cmd') install --frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw "pnpm install 失败（退出码 $LASTEXITCODE）" }
+        & (Join-Path $NodeRoot 'pnpm.cmd') run build
+        if ($LASTEXITCODE -ne 0) { throw "pnpm build 失败（退出码 $LASTEXITCODE）" }
+    } finally {
+        Pop-Location
+        $env:HTTP_PROXY = $oldHttp; $env:HTTPS_PROXY = $oldHttps
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'module\webroot\index.html'))) {
+        throw 'WebUI 构建产物缺失：module\webroot\index.html'
+    }
+    Say '  [OK] WebUI -> module\webroot' 'Green'
+} else {
+    Say '  [跳过] WebUI 构建（-SkipWebui），直接使用现有 module\webroot' 'Yellow'
 }
 
 # ============================ 3. 编译 ============================

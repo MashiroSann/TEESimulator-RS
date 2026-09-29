@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_default">System Default</string>
+    <string name="more_language">More</string>
+    <!-- Header -->
+    <string name="header_title">Tricky Addon</string>
+    <!-- Help Menu-->
+    <string name="help_help_instructions">Instructions</string>
+    <string name="help_save_and_update_description">Save current configure.</string>
+    <string name="help_select_denylist">Select From DenyList</string>
+    <string name="help_select_denylist_description">Available in Magisk only, select apps that are in the DenyList. Recommended.</string>
+    <string name="help_deselect_unnecessary">Deselect Unnecessary</string>
+    <string name="help_deselect_unnecessary_description">**Unnecessary category** - Xposed module, root manager, root-related apps, and general apps that never check bootloader status. This option requires Internet connection.</string>
+    <string name="help_add_system_app">Add System App</string>
+    <string name="help_add_system_app_description">Add specific system app to app list.</string>
+    <string name="help_set_keybox">Set Keybox</string>
+    <string name="help_set_keybox_description">Replace TrickyStore keybox with:</string>
+    <string name="help_set_keybox_aosp">**AOSP** - the default keybox comes with TrickyStore.</string>
+    <string name="help_set_keybox_unknown">**Unknown** - self-signed and not valid for Play Integrity verdict.</string>
+    <string name="help_set_keybox_local">**Local** - select keybox from your device.</string>
+    <string name="help_set_keybox_custom">**Custom** - custom keybox provider via online fetching.</string>
+    <string name="help_set_default_policy">Set Default Policy</string>
+    <string name="help_set_default_policy_description">Formerly `Set Security Patch`. Config default policy for all targeted apps, Leave blank or `no` to disable, `prop` to keep consist with system prop.</string>
+    <string name="help_prop_settings">Prop Settings</string>
+    <string name="help_prop_settings_description">Various prop related settings:</string>
+    <string name="help_prop_settings_handler">**Prop handler** - shamiko resetprop script toggle.</string>
+    <string name="help_prop_settings_boot_hash">**Boot hash** - get `verifiedBootHash` value from [KeyAttestation](https://github.com/vvb2060/KeyAttestation/releases). Fix abnormal boot state by resetting `ro.boot.vbmeta.digest`.</string>
+    <!-- Update -->
+    <string name="update_update_available">A new version is ready</string>
+    <string name="update_redirect_to_release">tap to download the latest version</string>
+    <string name="update_changelog">Changelog</string>
+    <string name="update_install">Install</string>
+    <string name="update_reboot">Reboot</string>
+    <string name="update_channel">Update Channel</string>
+    <string name="update_channel_stable">Stable</string>
+    <string name="update_channel_canary">Canary</string>
+    <string name="update_channel_disable">Disable</string>
+    <!-- Search -->
+    <string name="search_bar_search_placeholder">Search</string>
+    <!-- Functional Button -->
+    <string name="functional_button_save">Save</string>
+    <string name="functional_button_uninstall_webui">Uninstall WebUI</string>
+    <string name="functional_button_close">Close</string>
+    <string name="functional_button_cancel">Cancel</string>
+    <string name="functional_button_confirm">Confirm</string>
+    <string name="functional_button_reset">Reset</string>
+    <string name="functional_button_remove">Remove</string>
+    <string name="functional_button_today">Today</string>
+    <!-- Menu -->
+    <string name="menu_select_denylist">Select From DenyList</string>
+    <string name="menu_deselect_unnecessary">Deselect Unnecessary</string>
+    <string name="menu_add_system_app">Add System App</string>
+    <string name="menu_keybox">Keybox</string>
+    <string name="menu_keybox_aosp">AOSP</string>
+    <string name="menu_keybox_unknown">Unknown</string>
+    <string name="menu_keybox_local">Local</string>
+    <string name="menu_prop_setting">Prop Settings</string>
+    <string name="menu_set_default_policy">Set Default Policy</string>
+    <string name="menu_help">Help</string>
+    <string name="menu_language">Language</string>
+    <string name="menu_about">About</string>
+    <!-- Prop Dialog -->
+    <string name="prop_handler">Prop Handler</string>
+    <string name="boot_hash_title">Boot Hash</string>
+    <!-- About -->
+    <string name="about_module_name_line1">Tricky Addon</string>
+    <string name="about_module_name_line2">Update Target List</string>
+    <string name="about_by">by</string>
+    <string name="about_telegram_channel">Telegram Channel</string>
+    <string name="about_canary_update">Update to latest canary version</string>
+    <string name="about_translation_update">Update translation bundle</string>
+    <string name="about_disclaimer">This module is not a part of the Tricky Store module. DO NOT report any issues to Tricky Store if encountered.</string>
+    <string name="about_acknowledgment">Acknowledgment</string>
+    <!-- Prompt -->
+    <string name="prompt_aosp_key_set">AOSP keybox set successfully</string>
+    <string name="prompt_key_set_error">Failed to update keybox</string>
+    <string name="prompt_unknown_key_set">Unknown keybox set successfully</string>
+    <string name="prompt_boot_hash_set">Verified Boot Hash saved successfully</string>
+    <string name="prompt_boot_hash_set_error">Failed to update Verified Boot Hash</string>
+    <string name="prompt_saved_target">Config saved</string>
+    <string name="prompt_save_error">Failed to save config</string>
+    <string name="prompt_uninstall_prompt">WebUI will be removed after reboot</string>
+    <string name="prompt_uninstall_failed">Failed to uninstall WebUI</string>
+    <string name="prompt_checking_update">Checking update...</string>
+    <string name="prompt_new_update">A new update is available!</string>
+    <string name="prompt_no_update">There are currently no updates available</string>
+    <string name="prompt_downloading">Downloading new update...</string>
+    <string name="prompt_download_fail">Fail to download update</string>
+    <string name="prompt_installed">Installed successfully, reboot now.</string>
+    <string name="prompt_install_fail">Fail to install, please update manually</string>
+    <string name="prompt_rebooting">Rebooting...</string>
+    <string name="prompt_reboot_fail">Fail to reboot, please reboot manually</string>
+    <string name="prompt_translation_updated">Translation bundle updated successfully</string>
+    <string name="prompt_translation_update_failed">Failed to update translation bundle</string>
+    <string name="prompt_custom_key_set">Custom keybox set successfully</string>
+    <string name="prompt_custom_key_set_error">Failed to set custom keybox</string>
+    <string name="prompt_custom_saved">Custom keybox entry saved</string>
+    <string name="prompt_custom_fetch_error">Failed to fetch keybox</string>
+    <string name="prompt_custom_not_found">No custom keybox found</string>
+    <string name="prompt_custom_invalid_script">Script not allowed</string>
+    <string name="prompt_custom_removed">Custom keybox entry removed</string>
+    <!-- Security Patch -->
+    <string name="default_policy_title">Default Policy</string>
+    <string name="security_patch_invalid_all">Invalid format</string>
+    <!-- Add System App -->
+    <string name="add_system_app_title">Add System App</string>
+    <!-- CustomKB Dialog -->
+    <string name="customkb_dialog_title">Custom Keybox Provider</string>
+    <string name="customkb_name_placeholder">Name</string>
+    <string name="customkb_script_placeholder">Decode script</string>
+    <string name="customkb_export_success">Config exported to %s</string>
+    <string name="customkb_export_error">Failed to export config</string>
+    <string name="customkb_export_empty">Nothing to export</string>
+    <string name="customkb_import_success">Config imported</string>
+    <string name="customkb_import_error">Invalid config file</string>
+    <string name="customkb_remove_title">Confirm Remove?</string>
+    <string name="customkb_remove_message">Remove this custom keybox provider?</string>
+    <string name="customkb_reset_message">Reset custom keybox providers?</string>
+    <!-- Uninstall confirmation -->
+    <string name="confirmation_uninstall_title">Confirm Uninstall?</string>
+    <string name="confirmation_uninstall_message">Are you sure you want to uninstall Tricky Addon</string>
+    <!-- Mode dialog -->
+    <string name="mode_dialog_title">Mode</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_certificate_generating">Cert Generating</string>
+    <string name="mode_leaf_hack">Leaf Hack</string>
+    <string name="mode_set_custom_policy">Set Custom Policy</string>
+    <string name="mode_use_default_policy">Use Default Policy</string>
+</resources>

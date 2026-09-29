@@ -1,0 +1,18 @@
+# Build outputs
+.gradle/
+.kotlin/
+build/
+app/build/
+stub/build/
+native-certgen/target/
+out/
+local.properties
+app/src/main/jniLibs/
+
+# WebUI (vite)
+webui/node_modules/
+module/webroot/
+
+# IDE
+.idea/
+*.iml

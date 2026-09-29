@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_default">系统默认</string>
+    <string name="more_language">更多</string>
+    <!-- Header -->
+    <string name="header_title">TS 插件</string>
+    <!-- Help Menu-->
+    <string name="help_help_instructions">使用指南</string>
+    <string name="help_save_and_update_description">保存当前配置。</string>
+    <string name="help_select_denylist">从排除列表中选择</string>
+    <string name="help_select_denylist_description">仅适用于 Magisk，选择在排除列表中的应用。推荐使用。</string>
+    <string name="help_deselect_unnecessary">取消选择非必要应用</string>
+    <string name="help_deselect_unnecessary_description">**非必要分类** - Xposed 模块、root 管理器、与 root 相关的应用，以及从不检查 bootloader 状态的通用应用。此功能需连网使用。</string>
+    <string name="help_add_system_app">添加系统应用</string>
+    <string name="help_add_system_app_description">添加特定系统应用到应用列表。</string>
+    <string name="help_set_keybox">设置密钥</string>
+    <string name="help_set_keybox_description">替换 TrickyStore 的密钥为：</string>
+    <string name="help_set_keybox_aosp">**AOSP** - TrickyStore 的默认密钥。</string>
+    <string name="help_set_keybox_unknown">**未知** - 自签名密钥，不符合 Play Intergrity 要求。</string>
+    <string name="help_set_keybox_local">**本地** - 从本设备选择密钥。</string>
+    <string name="help_set_keybox_custom">**自定义** - 通过在线获取自定义密钥提供商。</string>
+    <string name="help_set_default_policy">使用默认策略</string>
+    <string name="help_set_default_policy_description">原为 `设置安全补丁` 。为所有目标应用设置默认策略，留空或 `no` 以禁用，`prop` 以与系统属性保持一致。</string>
+    <string name="help_prop_settings">Prop 设置</string>
+    <string name="help_prop_settings_description">Prop 相关设置：</string>
+    <string name="help_prop_settings_handler">**Prop 助手** - shamiko resetprop 脚本开关。</string>
+    <string name="help_prop_settings_boot_hash">**哈希值** - 从 [KeyAttestation](https://github.com/vvb2060/KeyAttestation/releases获取 `verifiedBootHash`。通过重置 `ro.boot.vbmeta.digest` 来修复异常的启动状态。</string>
+    <!-- Update -->
+    <string name="update_update_available">发现新的版本</string>
+    <string name="update_redirect_to_release">点击下载最新版本</string>
+    <string name="update_changelog">更新日志</string>
+    <string name="update_install">安装</string>
+    <string name="update_reboot">重启</string>
+    <string name="update_channel">更新通道</string>
+    <string name="update_channel_stable">稳定</string>
+    <string name="update_channel_canary">Canary</string>
+    <string name="update_channel_disable">禁用</string>
+    <!-- Search -->
+    <string name="search_bar_search_placeholder">搜索</string>
+    <!-- Functional Button -->
+    <string name="functional_button_save">保存</string>
+    <string name="functional_button_uninstall_webui">卸载 WebUI</string>
+    <string name="functional_button_close">关闭</string>
+    <string name="functional_button_cancel">取消</string>
+    <string name="functional_button_confirm">确认</string>
+    <string name="functional_button_reset">重置</string>
+    <string name="functional_button_remove">删除</string>
+    <string name="functional_button_today">今天</string>
+    <!-- Menu -->
+    <string name="menu_select_denylist">从排除列表中选择</string>
+    <string name="menu_deselect_unnecessary">取消选择非必要应用</string>
+    <string name="menu_add_system_app">添加系统应用</string>
+    <string name="menu_keybox">密钥</string>
+    <string name="menu_keybox_aosp">AOSP</string>
+    <string name="menu_keybox_unknown">未知</string>
+    <string name="menu_keybox_local">本地</string>
+    <string name="menu_keybox_repo">仓库</string>
+    <string name="menu_prop_setting">Prop 设置</string>
+    <string name="menu_set_default_policy">设置默认策略</string>
+    <string name="menu_help">帮助</string>
+    <string name="menu_language">语言</string>
+    <string name="menu_about">关于</string>
+    <!-- Prop Dialog -->
+    <string name="prop_handler">Prop 助手</string>
+    <string name="boot_hash_title">哈希值</string>
+    <!-- About -->
+    <string name="about_module_name_line1">TS插件</string>
+    <string name="about_module_name_line2">更新目标列表</string>
+    <string name="about_by">作者：</string>
+    <string name="about_telegram_channel">TG频道</string>
+    <string name="about_canary_update">下载最新测试版</string>
+    <string name="about_translation_update">更新翻译包</string>
+    <string name="about_disclaimer">此 WebUI 不是 Tricky Store 的一部分，遇到任何问题请勿向 Tricky Store 作者反馈。</string>
+    <string name="about_acknowledgment">特别鸣谢</string>
+    <!-- Prompt -->
+    <string name="prompt_aosp_key_set">成功设置 AOSP 密钥</string>
+    <string name="prompt_key_set_error">更新密钥失败</string>
+    <string name="prompt_unknown_key_set">成功设置未知密钥</string>
+    <string name="prompt_boot_hash_set">哈希值重置成功</string>
+    <string name="prompt_boot_hash_set_error">哈希值重置失败</string>
+    <string name="prompt_saved_target">配置已保存</string>
+    <string name="prompt_save_error">保存配置失败</string>
+    <string name="prompt_uninstall_prompt">WebUI 将在重启后被移除</string>
+    <string name="prompt_uninstall_failed">卸载 WebUI 失败</string>
+    <string name="prompt_checking_update">正在检测更新...</string>
+    <string name="prompt_new_update">发现新的版本！</string>
+    <string name="prompt_no_update">当前已是最新版本</string>
+    <string name="prompt_downloading">正在下载...</string>
+    <string name="prompt_download_fail">下载失败</string>
+    <string name="prompt_installed">安装完成，重启生效</string>
+    <string name="prompt_install_fail">安装失败，请手动更新</string>
+    <string name="prompt_rebooting">正在重启...</string>
+    <string name="prompt_reboot_fail">重启失败，请手动重启</string>
+    <string name="prompt_translation_updated">翻译包更新成功</string>
+    <string name="prompt_translation_update_failed">翻译包更新失败</string>
+    <string name="prompt_custom_key_set">成功设置自定义密钥</string>
+    <string name="prompt_custom_key_set_error">自定义密钥设置失败</string>
+    <string name="prompt_custom_saved">已保存自定义密钥入口</string>
+    <string name="prompt_custom_fetch_error">获取密钥失败</string>
+    <string name="prompt_custom_not_found">未找到自定义密钥</string>
+    <string name="prompt_custom_invalid_script">脚本不被允许</string>
+    <string name="prompt_custom_removed">已移除自定义密钥入口</string>
+    <string name="prompt_keybox_repo_set">仓库密钥设置成功</string>
+    <string name="prompt_keybox_repo_set_error">仓库密钥设置失败</string>
+    <string name="prompt_keybox_repo_download_error">下载 %s 失败</string>
+    <!-- Security Patch -->
+    <string name="default_policy_title">默认策略</string>
+    <string name="security_patch_invalid_all">无效格式</string>
+    <!-- Add System App -->
+    <string name="add_system_app_title">添加系统应用</string>
+    <!-- CustomKB Dialog -->
+    <string name="customkb_dialog_title">自定义密钥提供商</string>
+    <string name="customkb_name_placeholder">名称</string>
+    <string name="customkb_script_placeholder">解码脚本</string>
+    <string name="customkb_export_success">配置已保存至 %s</string>
+    <string name="customkb_export_error">配置导出失败</string>
+    <string name="customkb_export_empty">没有内容可导出</string>
+    <string name="customkb_import_success">已导入配置</string>
+    <string name="customkb_import_error">配置文件无效</string>
+    <string name="customkb_remove_title">确认删除？</string>
+    <string name="customkb_remove_message">移除此自定义密钥入口？</string>
+    <string name="customkb_reset_message">重置自定义密钥入口？</string>
+    <!-- Uninstall confirmation -->
+    <string name="confirmation_uninstall_title">确认卸载？</string>
+    <string name="confirmation_uninstall_message">您确定要卸载 TS 插件吗</string>
+    <!-- Mode dialog -->
+    <string name="mode_dialog_title">模式</string>
+    <string name="mode_auto">自动</string>
+    <string name="mode_certificate_generating">生成证书链</string>
+    <string name="mode_leaf_hack">修改证书链</string>
+    <string name="mode_set_custom_policy">使用自定义策略</string>
+    <string name="mode_use_default_policy">使用默认策略</string>
+</resources>
