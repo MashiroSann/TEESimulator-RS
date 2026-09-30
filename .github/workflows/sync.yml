@@ -372,9 +372,9 @@ jobs:
 
           常见原因：上游与本仓库冲突（冲突文件见日志中的 conflict 输出）或编译失败。
           处理：修复后重新手动运行本工作流；本分支未受影响，main 未被改动。"
-          existing=$(gh issue list --label upstream-sync --state open --json number --jq '.[0].number' || true)
+          existing=$(gh issue list -R "$GITHUB_REPOSITORY" --label upstream-sync --state open --json number --jq '.[0].number' || true)
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment "$existing" -R "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --label upstream-sync --title "$title" --body "$body"
+            gh issue create -R "$GITHUB_REPOSITORY" --label upstream-sync --title "$title" --body "$body"
           fi
