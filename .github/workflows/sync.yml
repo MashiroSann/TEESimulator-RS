@@ -249,7 +249,8 @@ jobs:
           if [ ! -s /tmp/notes.md ]; then
             echo "_Upstreams fast-forwarded without a commit range to list._" > /tmp/notes.md
           fi
-          echo "--- notes ---"; cat /tmp/notes.md
+          cp /tmp/notes.md sync-notes.md
+          echo "--- notes ---"; cat sync-notes.md
 
       - name: Push debug branch
         if: steps.updates.outputs.any_updated == 'yes'
@@ -263,7 +264,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sync-notes
-          path: /tmp/notes.md
+          path: sync-notes.md
           retention-days: 3
 
       - name: Capture version for later jobs
@@ -305,15 +306,23 @@ jobs:
           merge-multiple: true
           path: artifacts
 
+      - name: Normalize notes
+        run: |
+          if [ -s artifacts/sync-notes.md ]; then
+            cp artifacts/sync-notes.md /tmp/notes.md
+          else
+            printf '_本次同步无上游提交记录。_\n' > /tmp/notes.md
+          fi
+          echo "--- notes ---"; cat /tmp/notes.md
+
       - name: Open or update PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          notes=$(ls artifacts/sync-notes.md 2>/dev/null || echo /dev/null)
           {
             echo "## Upstream sync ($(date -u +%Y-%m-%d))"
             echo
-            if [ -s "$notes" ]; then cat "$notes"; fi
+            cat /tmp/notes.md
             echo
             echo "### 验收"
             echo "- [ ] 密钥认证/春秋回归通过"
@@ -346,7 +355,7 @@ jobs:
             --target debug \
             --title "$VER (pre-release)" \
             --prerelease \
-            --notes-file "$(ls artifacts/sync-notes.md 2>/dev/null || echo /dev/null)" \
+            --notes-file /tmp/notes.md \
             artifacts/TEESimulator-RS-*-Release.zip \
             artifacts/TEESimulator-RS-*-Debug.zip
 

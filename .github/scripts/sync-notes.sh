@@ -63,10 +63,10 @@ emit_section() {
 EMITTED=0
 
 OUT=$(emit_section "TEESimulator-RS 更新" "${TEES_REPO:-}" "${TEES_FROM_SHA:-}" "${TEES_TO_SHA:-}") || EMITTED=1
-if [ -n "$OUT" ]; then EMITTED=1; printf '%s\n' "$OUT"; fi
+if [ -n "$OUT" ]; then EMITTED=1; printf '%s\n\n' "$OUT"; fi
 
 OUT=$(emit_section "Tricky Addon 更新" "${TA_REPO:-}" "${TA_FROM_SHA:-}" "${TA_TO_SHA:-}") || EMITTED=1
-if [ -n "$OUT" ]; then EMITTED=1; printf '%s\n' "$OUT"; fi
+if [ -n "$OUT" ]; then EMITTED=1; printf '%s\n\n' "$OUT"; fi
 
 if [ "$EMITTED" = "1" ]; then
     printf -- '---\n> Synced: TEES@%s / TA@%s\n' \
