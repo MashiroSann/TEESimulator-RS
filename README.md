@@ -152,6 +152,37 @@ powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -ReleaseOnly # Relea
 powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -SkipWebui   # reuse module\webroot
 ```
 
+## Automated upstream sync and releases
+
+This fork tracks two upstreams with GitHub Actions:
+
+- [Enginex0/TEESimulator-RS](https://github.com/Enginex0/TEESimulator-RS) — the core simulator this fork is based on.
+- [KOWX712/Tricky-Addon-Update-Target-List](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) — the bundled `webui/` sources and support files.
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `Build` | push to `main` (module paths), pull requests, manual | Compile check only — builds the WebUI and the module zips, never publishes |
+| `Sync Upstreams` | **manual** | Merges both upstreams into a rebuilt `debug` branch, builds it, opens/updates a PR to `main`, and publishes a pre-release (`v6.0.1-<n>-pre` with Release + Debug zips) |
+| `Release` | **manual** (from `main`) | Builds `main`, publishes the latest stable release, and commits the regenerated `module/update.json` back with `[skip ci]` |
+
+Versions follow `v6.0.1-<commit count + 5>`; the tag, the version inside the zips, and `module/update.json` always agree. Only the stable release touches `module/update.json`, so pre-releases never reach users' update channels.
+
+### Sync flow
+
+1. Actions → **Sync Upstreams** → Run workflow. `dry_run` builds and pushes the draft `debug` branch without opening a PR or publishing a pre-release.
+2. The workflow merges Enginex0 (conflicts in repo-owned files such as `.github/**`, `build-module.ps1` and `module/update.json` resolve to this fork) and overlay-syncs Tricky Addon: `webui/` and the `module` support files are copied, while the six customized `webui` sources are 3-way merged. Conflicts elsewhere stop the run.
+3. When the build passes, review the PR and pre-release, flash the pre-release zip if you want a device check, then merge the PR.
+4. Actions → **Release** → Run workflow to publish the stable release (marked Latest).
+
+Release notes use two sections — `### TEESimulator-RS 更新` and `### Tricky Addon 更新` — emitted only when that upstream actually has new commits.
+
+### When something goes wrong
+
+- Conflicts or a failed build open/update an issue labeled `upstream-sync` with a link to the run; `main` and the update channel are never touched.
+- Retry: fix the cause (or resolve conflicts on the `debug` branch), then re-run **Sync Upstreams**.
+- Withdraw a pre-release: `gh release delete v6.0.1-<n>-pre --yes --cleanup-tag`, and close the PR if needed.
+- Stable releases: re-running `Release` for an existing tag is a no-op; to replace one, delete the release and tag first, then re-run.
+
 ## Compatibility
 
 | Root manager | Status |
