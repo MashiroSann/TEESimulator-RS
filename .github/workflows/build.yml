@@ -1,13 +1,37 @@
 name: Build
 
+# Reusable build pipeline (called by sync.yml and release.yml) plus a
+# compile-check for regular pushes and PRs. This workflow NEVER publishes:
+# releases live in sync.yml (pre-release) and release.yml (latest stable).
+
 on:
   push:
     branches: [ "main" ]
-    paths-ignore: [ '**.md' ]
+    paths:
+      - 'app/**'
+      - 'native-certgen/**'
+      - 'module/**'
+      - 'webui/**'
+      - 'stub/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - '.github/workflows/build.yml'
   pull_request:
     branches: [ "main" ]
-    paths-ignore: [ '**.md' ]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build (defaults to the caller's ref)"
+        type: string
+        required: false
+        default: ''
+    outputs:
+      version:
+        description: "Version parsed from the built release zip (e.g. v6.0.1-312)"
+        value: ${{ jobs.build.outputs.version }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,12 +40,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -58,6 +85,32 @@ jobs:
             ccache-${{ runner.os }}-
             ccache-
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 'latest'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
+          cache-dependency-path: webui/pnpm-lock.yaml
+
+      - name: Build WebUI
+        run: |
+          cd webui
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Verify WebUI payload
+        run: |
+          test -f module/webroot/index.html || {
+            echo '::error::module/webroot/index.html missing - WebUI build failed'
+            exit 1
+          }
+          echo "WebUI payload present: $(ls module/webroot | wc -l) entries"
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -66,12 +119,15 @@ jobs:
           chmod +x ./gradlew
           ./gradlew zipRelease zipDebug -Porg.gradle.parallel=true -Porg.gradle.vfs.watch=true -Dorg.gradle.jvmargs=-Xmx2048m
 
-      - name: Read version
-        id: ver
+      - name: Parse version from release zip
+        id: version
         run: |
-          ver=$(grep 'val verName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          count=$(git rev-list HEAD --count)
-          echo "version=${ver}-${count}" >> "$GITHUB_OUTPUT"
+          release_zip=$(ls out/TEESimulator-RS-*-Release.zip | head -1)
+          base=$(basename "$release_zip" .zip)      # TEESimulator-RS-v6.0.1-312-Release
+          version=${base#TEESimulator-RS-}          # v6.0.1-312-Release
+          version=${version%-Release}               # v6.0.1-312
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
 
       - name: List build artifacts
         run: |
@@ -99,71 +155,10 @@ jobs:
           retention-days: 30
           compression-level: 9
 
-  release:
-    needs: build
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
+      # Gradle's refreshUpdateJson rewrites module/update.json to match the built
+      # version; release.yml commits it back when publishing.
+      - uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
-
-      - name: Read version
-        id: ver
-        run: |
-          ver=$(grep 'val verName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          count=$(git rev-list HEAD --count)
-          echo "version=${ver}-${count}" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: TEESimulator-RS-release-zip
-          path: zips
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: TEESimulator-RS-debug-zip
-          path: zips
-
-      - name: Extract changelog
-        run: |
-          ver="${VER#v}"
-          awk "/^## TEESimulator-RS v${ver%%-*}/{flag=1; next} /^## TEESimulator-RS v/{if(flag) exit} flag" module/changelog.md > /tmp/notes.md
-          cat /tmp/notes.md
-        env:
-          VER: ${{ steps.ver.outputs.version }}
-
-      - name: Create release
-        run: |
-          gh release delete "$VER" --yes 2>/dev/null || true
-          RELEASE=$(ls zips/*Release*.zip | head -1)
-          DEBUG=$(ls zips/*Debug*.zip | head -1)
-          gh release create "$VER" \
-            --title "$VER" \
-            --latest \
-            --notes-file /tmp/notes.md \
-            "$RELEASE" \
-            "$DEBUG"
-        env:
-          VER: ${{ steps.ver.outputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Bump update.json
-        run: |
-          COUNT=$(git rev-list HEAD --count)
-          RELEASE_NAME=$(basename zips/*Release*.zip)
-          ZIP_URL="https://github.com/${{ github.repository }}/releases/download/${VER}/${RELEASE_NAME}"
-          jq ".versionCode = $COUNT | .zipUrl = \"$ZIP_URL\"" module/update.json > /tmp/update.json
-          mv /tmp/update.json module/update.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add module/update.json
-          git diff --cached --quiet || {
-            git commit -m "chore(release): bump update.json to $VER [skip ci]"
-            git push origin HEAD:main
-          }
-        env:
-          VER: ${{ steps.ver.outputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: module-update-json
+          path: module/update.json
+          retention-days: 30

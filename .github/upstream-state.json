@@ -1,0 +1,28 @@
+{
+  "teesimulator": {
+    "repo": "Enginex0/TEESimulator-RS",
+    "lastSyncedSha": "6d241e56d6e8146cd67ed4ac3dadc9c632969549",
+    "lastReleasedSha": "6d241e56d6e8146cd67ed4ac3dadc9c632969549"
+  },
+  "trickyAddon": {
+    "repo": "KOWX712/Tricky-Addon-Update-Target-List",
+    "lastSyncedSha": "cf167849aaa7696972a3c7826ec94294e9e47fce",
+    "lastReleasedSha": "cf167849aaa7696972a3c7826ec94294e9e47fce",
+    "syncPaths": {
+      "include": ["webui/", "module/prop.sh", "module/common/get_extra.sh", "module/common/.default"],
+      "overrides": [
+        "webui/vite.config.ts",
+        "webui/src/cli.ts",
+        "webui/src/config_legacy.ts",
+        "webui/src/main.ts",
+        "webui/src/update.ts",
+        "webui/src/dialog/about.ts"
+      ]
+    }
+  },
+  "keepOursOnConflict": [
+    ".github/",
+    "build-module.ps1",
+    "module/update.json"
+  ]
+}

@@ -1,0 +1,380 @@
+name: Sync Upstreams
+
+# Manually triggered upstream sync.
+#
+# Flow:
+#   1. Fetch Enginex0/TEESimulator-RS and KOWX712/Tricky-Addon-Update-Target-List.
+#   2. Rebuild the `debug` branch from main and merge both upstreams into it:
+#      - TEESimulator-RS: plain git merge; conflicts in keep-ours paths resolve to
+#        the local version, anything else aborts.
+#      - Tricky Addon: overlay sync (overwrite non-customized files, 3-way merge
+#        the customized ones listed in .github/upstream-state.json).
+#   3. Build the debug branch (reuses .github/workflows/build.yml).
+#   4. Publish: push `debug`, open/update a PR to main, create a pre-release
+#      (tag v<version>-pre) with both zips. update.json is NOT touched here;
+#      the stable release happens via release.yml after the PR is merged.
+#
+# Conflicts or failures open/comment an issue labeled `upstream-sync`.
+# `dry_run` still pushes the draft `debug` branch but skips the PR and
+# pre-release, so the merged tree and artifacts can be inspected first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip PR and pre-release)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: sync-upstreams
+  cancel-in-progress: false
+
+env:
+  TA_REPO: KOWX712/Tricky-Addon-Update-Target-List
+  TEES_REPO: Enginex0/TEESimulator-RS
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      any_updated: ${{ steps.updates.outputs.any_updated }}
+      tees_from: ${{ steps.state.outputs.tees_from }}
+      tees_to: ${{ steps.fetch.outputs.tees_to }}
+      ta_from: ${{ steps.state.outputs.ta_from }}
+      ta_to: ${{ steps.fetch.outputs.ta_to }}
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Read sync state
+        id: state
+        run: |
+          echo "tees_from=$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)" >> "$GITHUB_OUTPUT"
+          echo "ta_from=$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch upstream heads
+        id: fetch
+        run: |
+          tees_to=$(git ls-remote "https://github.com/$TEES_REPO.git" refs/heads/main | cut -f1)
+          ta_to=$(git ls-remote "https://github.com/$TA_REPO.git" refs/heads/main | cut -f1)
+          test -n "$tees_to" || { echo '::error::TEESimulator-RS upstream head not found'; exit 1; }
+          test -n "$ta_to" || { echo '::error::Tricky Addon upstream head not found'; exit 1; }
+          echo "tees_to=$tees_to" >> "$GITHUB_OUTPUT"
+          echo "ta_to=$ta_to" >> "$GITHUB_OUTPUT"
+          echo "Upstream TEES: ${{ steps.state.outputs.tees_from }} -> $tees_to"
+          echo "Upstream TA:   ${{ steps.state.outputs.ta_from }} -> $ta_to"
+
+      - name: Determine updates
+        id: updates
+        run: |
+          tees_from=${{ steps.state.outputs.tees_from }}
+          ta_from=${{ steps.state.outputs.ta_from }}
+          tees_to=${{ steps.fetch.outputs.tees_to }}
+          ta_to=${{ steps.fetch.outputs.ta_to }}
+          any=no
+          [ "$tees_from" != "$tees_to" ] && any=yes
+          [ "$ta_from" != "$ta_to" ] && any=yes
+          echo "any_updated=$any" >> "$GITHUB_OUTPUT"
+          echo "TEES updated: $([ "$tees_from" != "$tees_to" ] && echo yes || echo no)"
+          echo "TA updated:   $([ "$ta_from" != "$ta_to" ] && echo yes || echo no)"
+
+      - name: No-op exit
+        if: steps.updates.outputs.any_updated == 'no'
+        run: echo "Both upstreams unchanged since the last sync - nothing to do."
+
+      - name: Rebuild debug branch from main
+        if: steps.updates.outputs.any_updated == 'yes'
+        run: |
+          git branch -D debug 2>/dev/null || true
+          git push origin --delete debug 2>/dev/null || true
+          git checkout -b debug origin/main
+
+      # --- TEESimulator-RS upstream --------------------------------------------
+
+      - name: Merge TEESimulator-RS upstream
+        id: tees_merge
+        if: steps.updates.outputs.any_updated == 'yes'
+        run: |
+          git fetch "https://github.com/$TEES_REPO.git" main
+          if git merge --no-edit FETCH_HEAD 2>/tmp/merge.log; then
+            echo "TEESimulator-RS merged cleanly."
+            exit 0
+          fi
+          # Resolve keep-ours paths with the local version and finalize the merge.
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            path="${path%/}"
+            if git diff --name-only --diff-filter=U -- "$path" | grep -q .; then
+              echo "Resolving conflict with ours: $path"
+              git checkout --ours -- "$path"
+              git add -- "$path"
+            fi
+          done < <(jq -r '.keepOursOnConflict[]' .github/upstream-state.json)
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "::error::Unresolvable conflicts with TEESimulator-RS upstream:"
+            git diff --name-only --diff-filter=U | tee /tmp/tees-conflicts.txt
+            exit 1
+          fi
+          git commit --no-edit
+          echo "TEESimulator-RS merged (keep-ours resolved some paths)."
+
+      # --- Tricky Addon overlay --------------------------------------------------
+
+      - name: Sync Tricky Addon files
+        id: ta_sync
+        if: steps.updates.outputs.any_updated == 'yes'
+        env:
+          TA_FROM: ${{ steps.state.outputs.ta_from }}
+          TA_TO: ${{ steps.fetch.outputs.ta_to }}
+        run: |
+          set -euo pipefail
+          STATE=.github/upstream-state.json
+          mapfile -t INCLUDE < <(jq -r '.trickyAddon.syncPaths.include[]' "$STATE")
+          mapfile -t OVERRIDE < <(jq -r '.trickyAddon.syncPaths.overrides[]' "$STATE")
+          is_override() {
+            local f="$1" o
+            for o in "${OVERRIDE[@]}"; do
+              [ "$o" = "$f" ] && return 0
+            done
+            return 1
+          }
+
+          work=$(mktemp -d)
+          curl -fsSL "https://github.com/$TA_REPO/archive/$TA_TO.tar.gz" -o "$work/new.tar.gz"
+          mkdir -p "$work/new"
+          tar -xzf "$work/new.tar.gz" -C "$work/new" --strip-components=1
+          curl -fsSL "https://github.com/$TA_REPO/archive/$TA_FROM.tar.gz" -o "$work/base.tar.gz"
+          mkdir -p "$work/base"
+          tar -xzf "$work/base.tar.gz" -C "$work/base" --strip-components=1
+
+          : > "$work/files.txt"
+          for inc in "${INCLUDE[@]}"; do
+            inc="${inc%/}"
+            if [ -d "$work/new/$inc" ]; then
+              (cd "$work/new/$inc" && find . -type f -print0) |
+                while IFS= read -r -d '' rel; do printf '%s\n' "$inc/${rel#./}"; done \
+                >> "$work/files.txt"
+            elif [ -f "$work/new/$inc" ]; then
+              printf '%s\n' "$inc" >> "$work/files.txt"
+            fi
+          done
+          sort -u "$work/files.txt" -o "$work/files.txt"
+
+          : > "$work/ta-conflicts.txt"
+          copied=0; merged=0
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            new="$work/new/$f"
+            if is_override "$f"; then
+              base="$work/base/$f"; [ -f "$base" ] || base=/dev/null
+              if [ ! -f "$f" ]; then
+                mkdir -p "$(dirname "$f")"; cp "$new" "$f"; copied=$((copied+1)); continue
+              fi
+              cmp -s "$base" "$new" && continue            # upstream did not touch it
+              cmp -s "$base" "$f" && { cp "$new" "$f"; copied=$((copied+1)); continue; }
+              cp "$f" "$work/ours.bak"
+              if git merge-file -L ours -L base -L theirs "$f" "$base" "$new" >/dev/null 2>&1; then
+                merged=$((merged+1))
+              else
+                cp "$work/ours.bak" "$f"                   # keep ours, report the conflict
+                echo "$f" >> "$work/ta-conflicts.txt"
+              fi
+            else
+              if [ ! -f "$f" ] || ! cmp -s "$f" "$new"; then
+                mkdir -p "$(dirname "$f")"
+                cp "$new" "$f"; copied=$((copied+1))
+              fi
+            fi
+          done < "$work/files.txt"
+
+          # Files removed by upstream (never for overrides or locally-only files).
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            is_override "$f" && continue
+            [ -f "$f" ] || continue                        # locally-only, keep
+            [ -f "$work/base/$f" ] || continue             # not an upstream file, keep
+            if [ ! -f "$work/new/$f" ]; then
+              rm -f "$f"; copied=$((copied+1))
+            fi
+          done < <(git ls-files -- 'webui/*' 'module/prop.sh' 'module/common/*')
+
+          if [ -s "$work/ta-conflicts.txt" ]; then
+            echo "::error::Tricky Addon 3-way merge conflicts:"
+            cat "$work/ta-conflicts.txt"
+            exit 1
+          fi
+          echo "Overlay: $copied copied/updated, $merged 3-way merged, 0 conflicts."
+
+      - name: Update sync state and commit
+        if: steps.updates.outputs.any_updated == 'yes'
+        run: |
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(sync): import Tricky Addon @${{ steps.fetch.outputs.ta_to }}"
+          fi
+          jq --arg t "${{ steps.fetch.outputs.tees_to }}" --arg a "${{ steps.fetch.outputs.ta_to }}" \
+            '.teesimulator.lastSyncedSha = $t | .trickyAddon.lastSyncedSha = $a' \
+            .github/upstream-state.json > /tmp/state.json
+          mv /tmp/state.json .github/upstream-state.json
+          git add .github/upstream-state.json
+          git commit -m "chore(sync): update upstream state" || true
+
+      - name: Extract changelog notes
+        if: steps.updates.outputs.any_updated == 'yes'
+        env:
+          TEES_FROM_SHA: ${{ steps.state.outputs.tees_from }}
+          TEES_TO_SHA: ${{ steps.fetch.outputs.tees_to }}
+          TA_FROM_SHA: ${{ steps.state.outputs.ta_from }}
+          TA_TO_SHA: ${{ steps.fetch.outputs.ta_to }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .github/scripts/sync-notes.sh > /tmp/notes.md || true
+          if [ ! -s /tmp/notes.md ]; then
+            echo "_Upstreams fast-forwarded without a commit range to list._" > /tmp/notes.md
+          fi
+          echo "--- notes ---"; cat /tmp/notes.md
+
+      - name: Push debug branch
+        if: steps.updates.outputs.any_updated == 'yes'
+        run: |
+          # Pushed even for dry_run: the build job needs the branch. Publishing
+          # (PR / pre-release) is what dry_run skips.
+          git push -f origin debug
+
+      - name: Upload sync notes
+        if: steps.updates.outputs.any_updated == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-notes
+          path: /tmp/notes.md
+          retention-days: 3
+
+      - name: Capture version for later jobs
+        id: version
+        if: steps.updates.outputs.any_updated == 'yes'
+        run: |
+          # Same formula as gradle: commit count of the debug branch + 5.
+          count=$(git rev-list HEAD --count)
+          verName=$(grep 'val verName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=${verName}-$((count + 5))" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: sync
+    if: needs.sync.outputs.any_updated == 'yes'
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: debug
+    permissions:
+      contents: read
+
+  publish:
+    needs: [sync, build]
+    if: needs.sync.outputs.any_updated == 'yes' && inputs.dry_run == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: debug
+
+      - name: Download notes and zips
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '{sync-notes,TEESimulator-RS-release-zip,TEESimulator-RS-debug-zip}'
+          merge-multiple: true
+          path: artifacts
+
+      - name: Open or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          notes=$(ls artifacts/sync-notes.md 2>/dev/null || echo /dev/null)
+          {
+            echo "## Upstream sync ($(date -u +%Y-%m-%d))"
+            echo
+            if [ -s "$notes" ]; then cat "$notes"; fi
+            echo
+            echo "### 验收"
+            echo "- [ ] 密钥认证/春秋回归通过"
+            echo "- [ ] WebUI 功能正常（目标列表、keybox、补丁设置）"
+            echo "- [ ] pre-release 的 zip 真机可用"
+            echo
+            echo "合并本 PR 后，在 Actions 手动运行 **Release** 工作流发布正式版。"
+          } > /tmp/body.md
+
+          existing=$(gh pr list --head debug --state open --json number --jq '.[0].number' || true)
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "chore(sync): upstream sync $(date -u +%Y-%m-%d)" --body-file /tmp/body.md
+          else
+            gh pr create --base main --head debug \
+              --title "chore(sync): upstream sync $(date -u +%Y-%m-%d)" \
+              --body-file /tmp/body.md
+          fi
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VER: ${{ needs.sync.outputs.version }}
+        run: |
+          tag="${VER}-pre"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Deleting stale pre-release $tag"
+            gh release delete "$tag" --yes --cleanup-tag
+          fi
+          gh release create "$tag" \
+            --target debug \
+            --title "$VER (pre-release)" \
+            --prerelease \
+            --notes-file "$(ls artifacts/sync-notes.md 2>/dev/null || echo /dev/null)" \
+            artifacts/TEESimulator-RS-*-Release.zip \
+            artifacts/TEESimulator-RS-*-Debug.zip
+
+  notify-failure:
+    needs: [sync, build, publish]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Create or update sync issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="Upstream sync needs attention"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          body="## Sync run failed
+
+          - Run: $run_url
+          - TEES: ${{ needs.sync.outputs.tees_from }} → ${{ needs.sync.outputs.tees_to }}
+          - TA:   ${{ needs.sync.outputs.ta_from }} → ${{ needs.sync.outputs.ta_to }}
+
+          常见原因：上游与本仓库冲突（冲突文件见日志中的 conflict 输出）或编译失败。
+          处理：修复后重新手动运行本工作流；本分支未受影响，main 未被改动。"
+          existing=$(gh issue list --label upstream-sync --state open --json number --jq '.[0].number' || true)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --label upstream-sync --title "$title" --body "$body"
+          fi

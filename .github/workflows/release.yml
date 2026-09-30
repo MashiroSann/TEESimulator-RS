@@ -1,0 +1,131 @@
+name: Release
+
+# Manually triggered stable release ("Release latest").
+#
+# Flow:
+#   1. Build main via the reusable build workflow (WebUI + Release/Debug zips).
+#   2. Create the GitHub release tagged with the version embedded in the zips
+#      (v6.0.1-<count+5>), marked --latest, with both zips attached.
+#   3. Commit the gradle-generated module/update.json and the upstream
+#      lastReleased markers back to main with [skip ci].
+#
+# Release notes follow the split convention: `### TEESimulator-RS 更新` and
+# `### Tricky Addon 更新` sections are emitted only when the corresponding
+# upstream has commits newer than the last released markers. A release without
+# upstream changes gets a short fallback body.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build only, skip release and update.json commit"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-latest
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+
+  release:
+    needs: build
+    if: inputs.dry_run == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Guard: only release from main"
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo '::error::Release must be dispatched from the main branch'
+            exit 1
+          fi
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '{TEESimulator-RS-release-zip,TEESimulator-RS-debug-zip,module-update-json}'
+          merge-multiple: true
+          path: artifacts
+
+      - name: Resolve version and tag state
+        id: ver
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          VER="$VERSION"
+          test -n "$VER" || { echo '::error::build workflow did not report a version'; exit 1; }
+          # Double-check the tag matches the artifact actually downloaded.
+          ls artifacts/TEESimulator-RS-"$VER"-Release.zip >/dev/null
+          if gh release view "$VER" >/dev/null 2>&1; then
+            echo "::notice::Release $VER already exists - nothing to do."
+            echo "exists=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=no" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Version: $VER (commit $GITHUB_SHA)"
+
+      - name: Generate release notes
+        if: steps.ver.outputs.exists == 'no'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TEES_FROM=$(jq -r '.teesimulator.lastReleasedSha' .github/upstream-state.json)
+          TA_FROM=$(jq -r '.trickyAddon.lastReleasedSha' .github/upstream-state.json)
+          TEES_TO=$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)
+          TA_TO=$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)
+          TEES_REPO=Enginex0/TEESimulator-RS TEES_FROM_SHA="$TEES_FROM" TEES_TO_SHA="$TEES_TO" \
+          TA_REPO=KOWX712/Tricky-Addon-Update-Target-List TA_FROM_SHA="$TA_FROM" TA_TO_SHA="$TA_TO" \
+          bash .github/scripts/sync-notes.sh > /tmp/notes.md || true
+          if [ ! -s /tmp/notes.md ]; then
+            echo "_本次发布无上游更新。_" > /tmp/notes.md
+          fi
+          echo "--- notes ---"; cat /tmp/notes.md
+
+      - name: Create release
+        if: steps.ver.outputs.exists == 'no'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          gh release create "$VER" \
+            --target "$GITHUB_SHA" \
+            --title "$VER" \
+            --latest \
+            --notes-file /tmp/notes.md \
+            artifacts/TEESimulator-RS-"$VER"-Release.zip \
+            artifacts/TEESimulator-RS-"$VER"-Debug.zip
+
+      - name: Commit update.json and released markers
+        if: steps.ver.outputs.exists == 'no'
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          test -f artifacts/module/update.json || { echo '::error::module/update.json artifact missing'; exit 1; }
+          cp artifacts/module/update.json module/update.json
+          jq --arg t "$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)" \
+             --arg a "$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)" \
+             '.teesimulator.lastReleasedSha = $t | .trickyAddon.lastReleasedSha = $a' \
+             .github/upstream-state.json > /tmp/state.json
+          mv /tmp/state.json .github/upstream-state.json
+          git add module/update.json .github/upstream-state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): bump update.json to $VER [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "update.json and markers already up to date."
+          fi
