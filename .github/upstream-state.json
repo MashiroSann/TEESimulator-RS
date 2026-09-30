@@ -1,7 +1,7 @@
 {
   "teesimulator": {
     "repo": "Enginex0/TEESimulator-RS",
-    "lastSyncedSha": "1f96c8a13e0f06b24a14500c7ecd467c4a940d77",
+    "lastSyncedSha": "6d241e56d6e8146cd67ed4ac3dadc9c632969549",
     "lastReleasedSha": "6d241e56d6e8146cd67ed4ac3dadc9c632969549"
   },
   "trickyAddon": {
@@ -9,7 +9,12 @@
     "lastSyncedSha": "cf167849aaa7696972a3c7826ec94294e9e47fce",
     "lastReleasedSha": "cf167849aaa7696972a3c7826ec94294e9e47fce",
     "syncPaths": {
-      "include": ["webui/", "module/prop.sh", "module/common/get_extra.sh", "module/common/.default"],
+      "include": [
+        "webui/",
+        "module/prop.sh",
+        "module/common/get_extra.sh",
+        "module/common/.default"
+      ],
       "overrides": [
         "webui/vite.config.ts",
         "webui/src/cli.ts",
