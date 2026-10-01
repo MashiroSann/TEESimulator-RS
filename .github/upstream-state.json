@@ -9,7 +9,12 @@
     "lastSyncedSha": "cf167849aaa7696972a3c7826ec94294e9e47fce",
     "lastReleasedSha": "cf167849aaa7696972a3c7826ec94294e9e47fce",
     "syncPaths": {
-      "include": ["webui/", "module/prop.sh", "module/common/get_extra.sh", "module/common/.default"],
+      "include": [
+        "webui/",
+        "module/prop.sh",
+        "module/common/get_extra.sh",
+        "module/common/.default"
+      ],
       "overrides": [
         "webui/vite.config.ts",
         "webui/src/cli.ts",
