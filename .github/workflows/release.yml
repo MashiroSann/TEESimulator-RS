@@ -115,8 +115,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          test -f artifacts/module/update.json || { echo '::error::module/update.json artifact missing'; exit 1; }
-          cp artifacts/module/update.json module/update.json
+          # upload-artifact strips the leading "module/" path component, so the
+          # artifact may land as artifacts/update.json (not artifacts/module/update.json).
+          if [ -f artifacts/module/update.json ]; then
+            cp artifacts/module/update.json module/update.json
+          elif [ -f artifacts/update.json ]; then
+            cp artifacts/update.json module/update.json
+          else
+            echo '::error::module/update.json artifact missing'; exit 1
+          fi
           jq --arg t "$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)" \
              --arg a "$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)" \
              '.teesimulator.lastReleasedSha = $t | .trickyAddon.lastReleasedSha = $a' \
