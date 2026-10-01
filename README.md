@@ -1,11 +1,13 @@
+<h1 align="center">TEESimulator-RS</h1>
+<p align="center"><b>Pass hardware security checks on a rooted Android phone</b></p>
 <p align="center">
-  <h1 align="center">TEESimulator-RS</h1>
-  <p align="center"><b>Pass hardware security checks on a rooted Android phone</b></p>
-  <p align="center">
-    <a href="https://github.com/Enginex0/TEESimulator-RS/actions/workflows/build.yml"><img src="https://github.com/Enginex0/TEESimulator-RS/actions/workflows/build.yml/badge.svg" alt="Build"></a>
-    <img src="https://img.shields.io/badge/Android-10%2B-green?logo=android" alt="Android 10+">
-    <a href="https://t.me/superpowers9"><img src="https://img.shields.io/badge/Telegram-community-blue?logo=telegram" alt="Telegram"></a>
-  </p>
+  <a href="https://github.com/Enginex0/TEESimulator-RS/actions/workflows/build.yml"><img src="https://github.com/Enginex0/TEESimulator-RS/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <img src="https://img.shields.io/badge/Android-10%2B-green?logo=android" alt="Android 10+">
+  <a href="https://t.me/superpowers9"><img src="https://img.shields.io/badge/Telegram-community-blue?logo=telegram" alt="Telegram"></a>
+</p>
+
+<p align="center">
+  <b>English</b> | <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 ---
