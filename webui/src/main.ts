@@ -47,11 +47,11 @@ async function createConfig(tsInfo: Record<string, string>): Promise<Config> {
     case modId === TEES_MOD_ID:
       return new ConfigTeeSimulator()   // Tee Simulator
     case modId === TS_MOD_ID:
-      // TEESimulator-RS keeps the legacy target.txt + security_patch.txt surface;
-      // config.ini belongs to stock TrickyStore >= 246 only.
-      return (await File.exist('/data/adb/tricky_store/config.ini'))
-        ? new Config()
-        : new ConfigLegacy()
+      // TEESimulator-RS always uses the legacy target.txt + security_patch.txt
+      // surface. A leftover config.ini from stock TrickyStore must not flip the
+      // WebUI into stock mode — it would silently save policies to config.ini,
+      // which the app-side ConfigurationManager never reads.
+      return new ConfigLegacy()
     case Config.support(versionCode):
       return new Config()               // config.ini
     default:
