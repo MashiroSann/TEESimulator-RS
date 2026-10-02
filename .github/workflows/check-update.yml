@@ -1,0 +1,131 @@
+name: Check Upstream Updates
+
+on:
+  schedule:
+    # Every day at 03:00 UTC (11:00 Beijing)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: check-upstream
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compare upstream heads against synced state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TEES_REPO=Enginex0/TEESimulator-RS
+          TA_REPO=KOWX712/Tricky-Addon-Update-Target-List
+
+          TEES_SYNCED=$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)
+          TA_SYNCED=$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)
+
+          TEES_HEAD=$(gh api "repos/$TEES_REPO/commits/HEAD" --jq '.sha')
+          TA_HEAD=$(gh api "repos/$TA_REPO/commits/HEAD" --jq '.sha')
+
+          echo "TEES: synced=${TEES_SYNCED:0:7} head=${TEES_HEAD:0:7}"
+          echo "TA:   synced=${TA_SYNCED:0:7} head=${TA_HEAD:0:7}"
+
+          TEES_COUNT=$(gh api "repos/$TEES_REPO/compare/$TEES_SYNCED...$TEES_HEAD" --jq '.ahead_by' 2>/dev/null || echo 0)
+          TA_COUNT=$(gh api "repos/$TA_REPO/compare/$TA_SYNCED...$TA_HEAD" --jq '.ahead_by' 2>/dev/null || echo 0)
+
+          echo "TEES new commits: $TEES_COUNT"
+          echo "TA new commits:   $TA_COUNT"
+
+          {
+            echo "tees_count=$TEES_COUNT"
+            echo "ta_count=$TA_COUNT"
+            echo "tees_head=$TEES_HEAD"
+            echo "ta_head=$TA_HEAD"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$TEES_COUNT" -eq 0 ] && [ "$TA_COUNT" -eq 0 ]; then
+            echo "::notice::No upstream updates."
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_updates=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update upstream-sync issue
+        if: steps.check.outputs.has_updates == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEES_COUNT: ${{ steps.check.outputs.tees_count }}
+          TA_COUNT: ${{ steps.check.outputs.ta_count }}
+          TEES_HEAD: ${{ steps.check.outputs.tees_head }}
+          TA_HEAD: ${{ steps.check.outputs.ta_head }}
+        run: |
+          TITLE='Upstream updates available'
+          BODY=$(cat <<EOF
+          Upstream repositories have new commits. Run **Actions → Sync Upstreams** to pull them in.
+
+          | Upstream | New commits | Head |
+          |---|---|---|
+          | TEESimulator-RS | $TEES_COUNT | [$TEES_HEAD](https://github.com/Enginex0/TEESimulator-RS/commit/${TEES_HEAD:0:7}) |
+          | Tricky Addon | $TA_COUNT | [$TA_HEAD](https://github.com/KOWX712/Tricky-Addon-Update-Target-List/commit/${TA_HEAD:0:7}) |
+
+          <details><summary>Latest TEESimulator commits</summary>
+
+          $(gh api "repos/Enginex0/TEESimulator-RS/commits?per_page=10" --jq '.[] | "- \(.sha[0:7]) \(.commit.message | split("\n")[0])"')
+
+          </details>
+
+          <details><summary>Latest Tricky Addon commits</summary>
+
+          $(gh api "repos/KOWX712/Tricky-Addon-Update-Target-List/commits?per_page=10" --jq '.[] | "- \(.sha[0:7]) \(.commit.message | split("\n")[0])"')
+
+          </details>
+
+          ---
+          > This issue is auto-opened by the Check Upstream Updates workflow and will be closed automatically once a sync PR is merged (or when no updates remain).
+          EOF
+          )
+          echo "$BODY" > /tmp/body.md
+
+          EXISTING=$(gh issue list -R "$GITHUB_REPOSITORY" --label upstream-sync --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            gh issue comment "$EXISTING" -R "$GITHUB_REPOSITORY" --body-file /tmp/body.md
+            echo "Commented on existing issue #$EXISTING"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --label upstream-sync \
+              --body-file /tmp/body.md
+            echo "Created new upstream-sync issue"
+          fi
+
+      - name: Close upstream-sync issue when no updates
+        if: steps.check.outputs.has_updates == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list -R "$GITHUB_REPOSITORY" --label upstream-sync --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            gh issue close "$EXISTING" -R "$GITHUB_REPOSITORY" \
+              --comment "Upstreams are now synced (or match the recorded state). Closing."
+            echo "Closed issue #$EXISTING"
+          else
+            echo "No open upstream-sync issue to close."
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "## Upstream check"
+            echo ""
+            echo "| Upstream | New commits |"
+            echo "|---|---|"
+            echo "| TEESimulator-RS | ${{ steps.check.outputs.tees_count }} |"
+            echo "| Tricky Addon | ${{ steps.check.outputs.ta_count }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
