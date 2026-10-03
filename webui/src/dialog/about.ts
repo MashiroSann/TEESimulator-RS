@@ -1,4 +1,4 @@
-import type { MdDialog, MdFilledButton } from '@material/web/all'
+import type { MdDialog, MdFilledButton, MdTextButton } from '@material/web/all'
 import { i18n } from '../i18n'
 import { Cli } from '../cli'
 import type { Config } from '../config'
@@ -66,6 +66,7 @@ export class AboutDialog {
     fragment.querySelector<MdFilledButton>('#telegram')!.onclick = () => this.#cli.linkRedirect(UPSTREAM_TELEGRAM)
     // Points at this fork's repository.
     fragment.querySelector<MdFilledButton>('#github')!.onclick = () => this.#cli.linkRedirect(`https://github.com/${FORK_REPO}`)
+    fragment.querySelector<MdTextButton>('#close-about')!.onclick = () => this.close()
 
     return fragment
   }
