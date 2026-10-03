@@ -21,6 +21,7 @@
         "webui/src/config_legacy.ts",
         "webui/src/main.ts",
         "webui/src/dialog/about.ts",
+        "webui/src/dialog/dialog.ts",
         "webui/public/locales/strings/en.xml",
         "webui/public/locales/strings/zh-CN.xml"
       ],
