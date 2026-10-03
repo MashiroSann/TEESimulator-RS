@@ -68,6 +68,7 @@
     <string name="about_module_name_line2">Update Target List</string>
     <string name="about_by">by</string>
     <string name="about_telegram_channel">Telegram Channel</string>
+    <string name="about_telegram_upstream">upstream</string>
     <string name="about_canary_update">Update to latest canary version</string>
     <string name="about_translation_update">Update translation bundle</string>
     <string name="about_disclaimer">This module is not a part of the Tricky Store module. DO NOT report any issues to Tricky Store if encountered.</string>
@@ -93,6 +94,7 @@
     <string name="prompt_reboot_fail">Fail to reboot, please reboot manually</string>
     <string name="prompt_translation_updated">Translation bundle updated successfully</string>
     <string name="prompt_translation_update_failed">Failed to update translation bundle</string>
+    <string name="prompt_translation_disabled">Translation updates are disabled in this fork to protect its customized WebUI</string>
     <string name="prompt_custom_key_set">Custom keybox set successfully</string>
     <string name="prompt_custom_key_set_error">Failed to set custom keybox</string>
     <string name="prompt_custom_saved">Custom keybox entry saved</string>

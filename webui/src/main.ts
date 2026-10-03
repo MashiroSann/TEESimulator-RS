@@ -17,7 +17,7 @@ import { DialogController } from './dialog/dialog'
 import { UpdateManager } from './update'
 import { SearchBar } from './search_bar/search_bar'
 import { Keybind } from './keybind'
-import { LOCAL_STORAGE_PREFIX, MOD_ID, OMK_MOD_ID, TEES_MOD_ID, TS_MOD_ID } from './constant'
+import { MOD_ID, OMK_MOD_ID, TEES_MOD_ID, TS_MOD_ID } from './constant'
 import { File } from './file'
 import './style.scss'
 import { isDev } from './utils/dev'
@@ -75,14 +75,6 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = /* html */ `
   </section>
 
   <section class="body-content">
-    <div class="update hide">
-      <md-icon>cloud_download</md-icon>
-      <div class="update-text">
-        <span>${i18n.t('update_update_available')}</span>
-        <em>${i18n.t('update_redirect_to_release')}</em>
-      </div>
-      <md-ripple></md-ripple>
-    </div>
     <div class="app-list">
       <div class="loading"><md-circular-progress indeterminate></md-circular-progress></div>
     </div>
@@ -175,31 +167,9 @@ if (!Keybox.isKeygenAvailable() && !isDev()) {
   mainMenu.hideItem('keybox-unknown') // Hide 'Unknown keybox'
 }
 
-const updateCard = document.querySelector<HTMLElement>('.update')!
-let pendingChangelog: string | null = null
-
-// Check module update
-const updateManager = new UpdateManager(cli, config)
-async function checkUpdate(): Promise<void> {
-  const channel = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}UpdateChannel`) || 'stable'
-  if (channel === 'disable') {
-    return
-  }
-  try {
-    const info = await updateManager.checkUpdate(channel as 'stable' | 'canary')
-    updateCard.classList.toggle('hide', !info.available)
-    if (!info.available) return
-    snackbar.show(i18n.t('prompt_new_update'))
-    pendingChangelog = await updateManager.getChangelog(channel as 'stable' | 'canary', info.versionCode)
-    updateCard.onclick = () => {
-      if (pendingChangelog) dialogController.showUpdate(pendingChangelog)
-    }
-  } catch {
-    updateCard.classList.add('hide')
-  }
-}
-checkUpdate().catch(() => {})
-document.addEventListener('update-channel-changed', () => checkUpdate())
+// The bundled Tricky Addon WebUI has no self-update path in this fork; module
+// updates are checked by the root manager via the module's updateJson.
+const updateManager = new UpdateManager(cli)
 
 // Keyboard shortcut events
 keybind.on('keybind-select-all', () => appList.selectAll())

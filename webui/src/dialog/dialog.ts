@@ -9,7 +9,6 @@ import { HelpDialog } from './help'
 import { UninstallDialog } from './uninstall'
 import { SystemAppDialog } from './system_app'
 import { PropDialog } from './prop'
-import { UpdateDialog } from './update'
 import { I18nDialog } from './i18n'
 import './dialog.scss'
 
@@ -20,7 +19,6 @@ export class DialogController {
   readonly defaultPolicy: DefaultPolicyDialog
   readonly systemApp: SystemAppDialog
   readonly prop: PropDialog
-  readonly update: UpdateDialog
   readonly i18nDialog: I18nDialog
 
   constructor(cli: Cli, config: Config, updateManager: UpdateManager, snackbar: Snackbar, appList: AppList) {
@@ -30,7 +28,6 @@ export class DialogController {
     this.defaultPolicy = new DefaultPolicyDialog(config)
     this.systemApp = new SystemAppDialog(appList)
     this.prop = new PropDialog(cli, config, snackbar)
-    this.update = new UpdateDialog(cli, updateManager, snackbar)
     this.i18nDialog = new I18nDialog(cli)
   }
 
@@ -41,7 +38,6 @@ export class DialogController {
     container.appendChild(this.defaultPolicy.getElement())
     container.appendChild(this.systemApp.getElement())
     container.appendChild(this.prop.getElement())
-    container.appendChild(this.update.getElement())
     container.appendChild(this.i18nDialog.getElement())
     this.about.initAnimation()
     this.help.initAnimation()
@@ -49,16 +45,11 @@ export class DialogController {
     this.defaultPolicy.initAnimation()
     this.systemApp.initAnimation()
     this.prop.initAnimation()
-    this.update.initAnimation()
     this.i18nDialog.initAnimation()
   }
 
   showAbout(): void {
     this.about.show()
-  }
-
-  showUpdate(changelog: string): void {
-    this.update.show(changelog)
   }
 
   showHelp(): void {

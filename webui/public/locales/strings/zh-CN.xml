@@ -68,6 +68,7 @@
     <string name="about_module_name_line2">更新目标列表</string>
     <string name="about_by">作者：</string>
     <string name="about_telegram_channel">TG频道</string>
+    <string name="about_telegram_upstream">原版</string>
     <string name="about_canary_update">下载最新测试版</string>
     <string name="about_translation_update">更新翻译包</string>
     <string name="about_disclaimer">此 WebUI 不是 Tricky Store 的一部分，遇到任何问题请勿向 Tricky Store 作者反馈。</string>
@@ -93,6 +94,7 @@
     <string name="prompt_reboot_fail">重启失败，请手动重启</string>
     <string name="prompt_translation_updated">翻译包更新成功</string>
     <string name="prompt_translation_update_failed">翻译包更新失败</string>
+    <string name="prompt_translation_disabled">本 fork 已禁用翻译更新，以保护定制的 WebUI 内容</string>
     <string name="prompt_custom_key_set">成功设置自定义密钥</string>
     <string name="prompt_custom_key_set_error">自定义密钥设置失败</string>
     <string name="prompt_custom_saved">已保存自定义密钥入口</string>
