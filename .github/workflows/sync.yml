@@ -148,10 +148,18 @@ jobs:
           STATE=.github/upstream-state.json
           mapfile -t INCLUDE < <(jq -r '.trickyAddon.syncPaths.include[]' "$STATE")
           mapfile -t OVERRIDE < <(jq -r '.trickyAddon.syncPaths.overrides[]' "$STATE")
+          mapfile -t DELETE < <(jq -r '.trickyAddon.syncPaths.deletePaths[]?' "$STATE")
           is_override() {
             local f="$1" o
             for o in "${OVERRIDE[@]}"; do
               [ "$o" = "$f" ] && return 0
+            done
+            return 1
+          }
+          is_deleted() {
+            local f="$1" d
+            for d in "${DELETE[@]}"; do
+              [ "$d" = "$f" ] && return 0
             done
             return 1
           }
@@ -182,6 +190,12 @@ jobs:
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             new="$work/new/$f"
+            # Files this fork removes on purpose (e.g. the bundled WebUI
+            # self-update machinery): never copy or merge them back.
+            if is_deleted "$f"; then
+              [ -f "$f" ] && { rm -f "$f"; copied=$((copied+1)); }
+              continue
+            fi
             if is_override "$f"; then
               base="$work/base/$f"; [ -f "$base" ] || base=/dev/null
               if [ ! -f "$f" ]; then

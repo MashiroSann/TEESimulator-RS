@@ -20,8 +20,11 @@
         "webui/src/cli.ts",
         "webui/src/config_legacy.ts",
         "webui/src/main.ts",
-        "webui/src/update.ts",
         "webui/src/dialog/about.ts"
+      ],
+      "deletePaths": [
+        "webui/src/update.ts",
+        "webui/src/dialog/update.ts"
       ]
     }
   },
