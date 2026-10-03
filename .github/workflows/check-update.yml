@@ -2,8 +2,10 @@ name: Check Upstream Updates
 
 on:
   schedule:
-    # Every day at 03:00 UTC (11:00 Beijing)
-    - cron: '0 3 * * *'
+    # Daily ~03:23 UTC (~11:23 Beijing). GitHub's schedule is best-effort:
+    # top-of-hour crons get delayed the most under load, so use a non-zero
+    # minute. Occasional delays of minutes -- sometimes hours -- are expected.
+    - cron: '23 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -22,6 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Compare upstream heads against synced state
+        id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -37,8 +40,13 @@ jobs:
           echo "TEES: synced=${TEES_SYNCED:0:7} head=${TEES_HEAD:0:7}"
           echo "TA:   synced=${TA_SYNCED:0:7} head=${TA_HEAD:0:7}"
 
-          TEES_COUNT=$(gh api "repos/$TEES_REPO/compare/$TEES_SYNCED...$TEES_HEAD" --jq '.ahead_by' 2>/dev/null || echo 0)
-          TA_COUNT=$(gh api "repos/$TA_REPO/compare/$TA_SYNCED...$TA_HEAD" --jq '.ahead_by' 2>/dev/null || echo 0)
+          # A failed compare (e.g. upstream rewrote history and the recorded SHA
+          # no longer exists) must NOT look like "no updates" -- fall back to
+          # "unknown" so the issue still gets opened for a human to review.
+          TEES_COUNT=$(gh api "repos/$TEES_REPO/compare/$TEES_SYNCED...$TEES_HEAD" --jq '.ahead_by' 2>/dev/null) || TEES_COUNT=""
+          TA_COUNT=$(gh api "repos/$TA_REPO/compare/$TA_SYNCED...$TA_HEAD" --jq '.ahead_by' 2>/dev/null) || TA_COUNT=""
+          TEES_COUNT="${TEES_COUNT:-unknown}"
+          TA_COUNT="${TA_COUNT:-unknown}"
 
           echo "TEES new commits: $TEES_COUNT"
           echo "TA new commits:   $TA_COUNT"
@@ -50,7 +58,7 @@ jobs:
             echo "ta_head=$TA_HEAD"
           } >> "$GITHUB_OUTPUT"
 
-          if [ "$TEES_COUNT" -eq 0 ] && [ "$TA_COUNT" -eq 0 ]; then
+          if [ "$TEES_COUNT" = "0" ] && [ "$TA_COUNT" = "0" ]; then
             echo "::notice::No upstream updates."
             echo "has_updates=false" >> "$GITHUB_OUTPUT"
           else
@@ -98,6 +106,8 @@ jobs:
             gh issue comment "$EXISTING" -R "$GITHUB_REPOSITORY" --body-file /tmp/body.md
             echo "Commented on existing issue #$EXISTING"
           else
+            gh label create upstream-sync -R "$GITHUB_REPOSITORY" \
+              --color FBCA04 --description "Upstream sync notification" --force
             gh issue create -R "$GITHUB_REPOSITORY" \
               --title "$TITLE" \
               --label upstream-sync \

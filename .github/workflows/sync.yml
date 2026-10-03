@@ -117,6 +117,14 @@ jobs:
             echo "TEESimulator-RS merged cleanly."
             exit 0
           fi
+          # A failed merge that left no conflict state means something worse than
+          # content conflicts (unrelated histories, corrupt fetch...). Fail with
+          # the actual git output instead of a confusing later commit error.
+          if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+            echo "::error::TEESimulator-RS merge failed without conflict state:"
+            cat /tmp/merge.log
+            exit 1
+          fi
           # Resolve keep-ours paths with the local version and finalize the merge.
           while IFS= read -r path; do
             [ -n "$path" ] || continue
@@ -399,5 +407,7 @@ jobs:
           if [ -n "$existing" ]; then
             gh issue comment "$existing" -R "$GITHUB_REPOSITORY" --body "$body"
           else
+            gh label create upstream-sync -R "$GITHUB_REPOSITORY" \
+              --color FBCA04 --description "Upstream sync notification" --force
             gh issue create -R "$GITHUB_REPOSITORY" --label upstream-sync --title "$title" --body "$body"
           fi
