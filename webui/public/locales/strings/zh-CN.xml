@@ -94,7 +94,6 @@
     <string name="prompt_reboot_fail">重启失败，请手动重启</string>
     <string name="prompt_translation_updated">翻译包更新成功</string>
     <string name="prompt_translation_update_failed">翻译包更新失败</string>
-    <string name="prompt_translation_disabled">本 fork 已禁用翻译更新，以保护定制的 WebUI 内容</string>
     <string name="prompt_custom_key_set">成功设置自定义密钥</string>
     <string name="prompt_custom_key_set_error">自定义密钥设置失败</string>
     <string name="prompt_custom_saved">已保存自定义密钥入口</string>

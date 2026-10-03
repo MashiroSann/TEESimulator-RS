@@ -94,7 +94,6 @@
     <string name="prompt_reboot_fail">Fail to reboot, please reboot manually</string>
     <string name="prompt_translation_updated">Translation bundle updated successfully</string>
     <string name="prompt_translation_update_failed">Failed to update translation bundle</string>
-    <string name="prompt_translation_disabled">Translation updates are disabled in this fork to protect its customized WebUI</string>
     <string name="prompt_custom_key_set">Custom keybox set successfully</string>
     <string name="prompt_custom_key_set_error">Failed to set custom keybox</string>
     <string name="prompt_custom_saved">Custom keybox entry saved</string>
