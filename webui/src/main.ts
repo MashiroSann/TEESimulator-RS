@@ -14,7 +14,6 @@ import { History } from './history'
 import { Keybox } from './keybox/keybox'
 import { KeyboxRepo } from './keybox/repo/repo'
 import { DialogController } from './dialog/dialog'
-import { UpdateManager } from './update'
 import { SearchBar } from './search_bar/search_bar'
 import { Keybind } from './keybind'
 import { MOD_ID, OMK_MOD_ID, TEES_MOD_ID, TS_MOD_ID } from './constant'
@@ -169,7 +168,6 @@ if (!Keybox.isKeygenAvailable() && !isDev()) {
 
 // The bundled Tricky Addon WebUI has no self-update path in this fork; module
 // updates are checked by the root manager via the module's updateJson.
-const updateManager = new UpdateManager(cli)
 
 // Keyboard shortcut events
 keybind.on('keybind-select-all', () => appList.selectAll())
@@ -179,7 +177,7 @@ keybind.on('keybind-save', () => saveTarget())
 keybind.on('keybind-esc', () => history.back())
 
 // Dialog
-const dialogController = new DialogController(cli, config, updateManager, snackbar, appList)
+const dialogController = new DialogController(cli, config, snackbar, appList)
 const dialogContent = document.querySelector<HTMLElement>('.dialog-content')!
 fileSelector.appendTo(dialogContent)
 keybox.appendTo(dialogContent)

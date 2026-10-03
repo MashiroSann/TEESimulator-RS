@@ -1,5 +1,4 @@
 import { Cli } from '../cli'
-import type { UpdateManager } from '../update'
 import type { Snackbar } from '../snackbar/snackbar'
 import { Config } from '../config'
 import { AppList } from '../app_list/app_list'
@@ -21,8 +20,8 @@ export class DialogController {
   readonly prop: PropDialog
   readonly i18nDialog: I18nDialog
 
-  constructor(cli: Cli, config: Config, updateManager: UpdateManager, snackbar: Snackbar, appList: AppList) {
-    this.about = new AboutDialog(cli, updateManager, snackbar, config)
+  constructor(cli: Cli, config: Config, snackbar: Snackbar, appList: AppList) {
+    this.about = new AboutDialog(cli, config)
     this.help = new HelpDialog(cli)
     this.uninstall = new UninstallDialog(cli, snackbar)
     this.defaultPolicy = new DefaultPolicyDialog(config)
