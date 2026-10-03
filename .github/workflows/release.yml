@@ -129,7 +129,24 @@ jobs:
              '.teesimulator.lastReleasedSha = $t | .trickyAddon.lastReleasedSha = $a' \
              .github/upstream-state.json > /tmp/state.json
           mv /tmp/state.json .github/upstream-state.json
-          git add module/update.json .github/upstream-state.json
+          # Changelog: the root manager shows module/changelog.md in its update
+          # dialog. Manual maintenance releases have a curated section written
+          # before the workflow runs; sync-driven releases get one generated
+          # from the release notes.
+          if ! grep -qF "## TEESimulator-RS $VER" module/changelog.md; then
+            {
+              echo "## TEESimulator-RS $VER"
+              echo
+              cat /tmp/notes.md
+              echo
+            } > /tmp/changelog.md
+            cat module/changelog.md >> /tmp/changelog.md
+            mv /tmp/changelog.md module/changelog.md
+            echo "Prepended generated changelog section for $VER"
+          else
+            echo "Changelog already has a section for $VER"
+          fi
+          git add module/update.json module/changelog.md .github/upstream-state.json
           if ! git diff --cached --quiet; then
             git commit -m "chore(release): bump update.json to $VER [skip ci]"
             git push origin HEAD:main
