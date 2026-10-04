@@ -149,7 +149,7 @@ jobs:
         id: version
         run: |
           release_zip=$(ls out/TEESimulator-RS-*-Release-Enhanced.zip | head -1)
-          base=$(basename "$release_zip" .zip)      # v6.0.1-312-Release-Enhanced suffix
+          base=$(basename "$release_zip" .zip)      # TEESimulator-RS-v6.0.1-312-Release-Enhanced
           version=${base#TEESimulator-RS-}          # v6.0.1-312-Release-Enhanced
           version=${version%-Release-Enhanced}      # v6.0.1-312
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -184,8 +184,9 @@ jobs:
           retention-days: 30
           compression-level: 9
 
-      # Gradle's refreshUpdateJson rewrites module/update.json to match the built
-      # version; release.yml commits it back when publishing.
+      # Gradle's refreshUpdateJson rewrites the update manifests (module/update.json
+      # for Enhanced, module/update-noenh.json for NoEnhanced) to match the built
+      # version; release.yml commits both back when publishing.
       - uses: actions/upload-artifact@v7
         with:
           name: module-update-json

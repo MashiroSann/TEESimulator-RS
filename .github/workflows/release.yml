@@ -7,8 +7,9 @@ name: Release
 #   2. Create the GitHub release tagged with the version embedded in the zips
 #      (v6.0.1-<count+5>), marked --latest, with all four zips attached
 #      (Release/Debug, each with and without the bundled enhanced backend).
-#   3. Commit the gradle-generated module/update.json and the upstream
-#      lastReleased markers back to main with [skip ci].
+#   3. Commit the gradle-generated update manifests (module/update.json for
+#      the Enhanced package, module/update-noenh.json for NoEnhanced) and the
+#      upstream lastReleased markers back to main with [skip ci].
 #
 # Release notes follow the split convention: `### TEESimulator-RS 更新` and
 # `### Tricky Addon 更新` sections are emitted only when the corresponding
@@ -19,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Build only, skip release and update.json commit"
+        description: "Build only, skip release and update-manifest commit"
         type: boolean
         default: false
 
@@ -111,7 +112,7 @@ jobs:
             artifacts/TEESimulator-RS-"$VER"-Debug-Enhanced.zip \
             artifacts/TEESimulator-RS-"$VER"-Debug-NoEnhanced.zip
 
-      - name: Commit update.json and released markers
+      - name: Commit update manifests and released markers
         if: steps.ver.outputs.exists == 'no'
         env:
           VER: ${{ steps.ver.outputs.version }}
@@ -158,8 +159,8 @@ jobs:
           fi
           git add module/update.json module/update-noenh.json module/changelog.md .github/upstream-state.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore(release): bump update.json to $VER [skip ci]"
+            git commit -m "chore(release): bump update manifests to $VER [skip ci]"
             git push origin HEAD:main
           else
-            echo "update.json and markers already up to date."
+            echo "update manifests and markers already up to date."
           fi
