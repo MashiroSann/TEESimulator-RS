@@ -1,0 +1,95 @@
+# Patch: keep the current security patch date when the bulletin is unreachable
+#
+# Upstream: Enginex0/tricky-addon-enhanced @ v5.53.1 (5c5e497)
+# Applies to: rust/src/security_patch/bulletin.rs
+#
+# Upstream falls back to a hardcoded patch table when scraping
+# source.android.com fails; once that table is older than three months it is
+# deemed stale and a synthetic "current month, day 01" date is generated
+# instead. That date can be newer than anything Google has actually published
+# and silently overwrites the configured patch level (e.g. during offline
+# boots or while the daily auto-update task runs without connectivity).
+#
+# This patch removes the synthetic/stale fallback entirely: on scrape failure
+# fetch_latest_patch() returns the error, so the CLI reports it and the daemon
+# logs a warning and keeps the existing security_patch.txt / devconfig.toml
+# values untouched until the next successful fetch.
+#
+diff --git a/rust/src/security_patch/bulletin.rs b/rust/src/security_patch/bulletin.rs
+index eb24933..7c6b25c 100644
+--- a/rust/src/security_patch/bulletin.rs
++++ b/rust/src/security_patch/bulletin.rs
+@@ -6,11 +6,6 @@ use crate::platform::network;
+ const BULLETIN_URL: &str =
+     "https://source.android.com/docs/security/bulletin/pixel";
+ 
+-const FALLBACK_PATCHES: &[&str] = &[
+-    "2026-03-01", "2026-02-01", "2026-01-01",
+-    "2025-12-01", "2025-11-01", "2025-10-01",
+-];
+-
+ pub fn fetch_latest_patch() -> Result<String> {
+     match fetch_from_bulletin() {
+         Ok(date) => {
+@@ -18,8 +13,12 @@ pub fn fetch_latest_patch() -> Result<String> {
+             Ok(date)
+         }
+         Err(e) => {
+-            warn!("bulletin scrape failed: {e}, using fallback table");
+-            fallback_patch_date()
++            // Never invent a patch level on failure: a synthetic or stale
++            // fallback date may be newer than anything Google has published
++            // and would silently overwrite the user's date. Report the error
++            // so callers keep the currently configured value instead.
++            warn!("bulletin scrape failed, keeping current patch date: {e}");
++            Err(e)
+         }
+     }
+ }
+@@ -90,46 +89,3 @@ fn is_valid_patch_date(s: &str) -> bool {
+         && parts[2].chars().all(|c| c.is_ascii_digit())
+         && parts[0].starts_with("20")
+ }
+-
+-fn fallback_patch_date() -> Result<String> {
+-    if let Some(latest) = FALLBACK_PATCHES.first() {
+-        if is_stale(latest) {
+-            let synthetic = derive_current_month_date();
+-            warn!("fallback table is stale, using derived date: {synthetic}");
+-            return Ok(synthetic);
+-        }
+-        warn!("using hardcoded fallback patch date: {latest}");
+-        return Ok(latest.to_string());
+-    }
+-    anyhow::bail!("no fallback patch dates available")
+-}
+-
+-fn is_stale(date: &str) -> bool {
+-    let parts: Vec<&str> = date.split('-').collect();
+-    if parts.len() != 3 {
+-        return true;
+-    }
+-    let year: i32 = parts[0].parse().unwrap_or(0);
+-    let month: i32 = parts[1].parse().unwrap_or(0);
+-    let date_months = year * 12 + month;
+-
+-    let now = std::time::SystemTime::now()
+-        .duration_since(std::time::UNIX_EPOCH)
+-        .unwrap_or_default()
+-        .as_secs();
+-    let approx_year = 1970 + (now / 31_557_600) as i32;
+-    let approx_month = ((now % 31_557_600) / 2_629_800) as i32 + 1;
+-    let now_months = approx_year * 12 + approx_month;
+-
+-    now_months - date_months > 3
+-}
+-
+-fn derive_current_month_date() -> String {
+-    let now = std::time::SystemTime::now()
+-        .duration_since(std::time::UNIX_EPOCH)
+-        .unwrap_or_default()
+-        .as_secs();
+-    let year = 1970 + now / 31_557_600;
+-    let month = (now % 31_557_600) / 2_629_800 + 1;
+-    format!("{}-{:02}-01", year, month.min(12))
+-}
