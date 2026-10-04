@@ -1,18 +1,23 @@
 # Patch: restore the original module description when live status is disabled
 #
 # Upstream: Enginex0/tricky-addon-enhanced @ v5.53.1 (5c5e497)
-# Applies to: rust/src/config/mod.rs, rust/src/daemon/scheduler.rs
+# Applies to: rust/src/config/mod.rs, rust/src/daemon/scheduler.rs,
+#             rust/src/daemon/tasks.rs
 #
 # The live module description is only refreshed by StatusTask while
 # config.status.enabled is true. Turning it off left the last generated
 # live text in module.prop forever, because the disabled task never runs
 # and nothing else restores description.bak.
 #
-# * `config set status.enabled false` now restores the original description
+# * `config set status.enabled false` restores the original description
 #   right away (works even when the daemon is not running).
-# * The daemon also restores it when the config transition is picked up at
-#   runtime, and once at startup if the task is already disabled, so a stale
-#   live description can never survive a reboot either.
+# * The scheduler now reports enabled->disabled transitions to the tasks
+#   via a new DaemonTask::on_disabled hook, and calls it once for tasks
+#   that start disabled, so a stale live description cannot survive a
+#   daemon restart either.
+# * StatusTask::on_disabled restores description.bak and clears its
+#   memoized last_description, so re-enabling the feature rewrites the
+#   live text immediately instead of waiting for a status value change.
 #
 #diff --git a/rust/src/config/mod.rs b/rust/src/config/mod.rs
 index 3689a2f..8121c5c 100644
@@ -32,36 +37,77 @@ index 3689a2f..8121c5c 100644
          }
          ConfigAction::Migrate => {
 #diff --git a/rust/src/daemon/scheduler.rs b/rust/src/daemon/scheduler.rs
-index fa6f892..64233b9 100644
+index fa6f892..ff4b076 100644
 --- a/rust/src/daemon/scheduler.rs
 +++ b/rust/src/daemon/scheduler.rs
-@@ -18,7 +18,13 @@ struct TaskSlot {
+@@ -18,7 +18,7 @@ struct TaskSlot {
  }
  
  impl Scheduler {
 -    pub fn new(_config: &Config, epoll_fd: RawFd, manager: Option<String>) -> anyhow::Result<Self> {
 +    pub fn new(config: &Config, epoll_fd: RawFd, manager: Option<String>) -> anyhow::Result<Self> {
-+        // Starting with the status task disabled must not leave a stale live
-+        // description behind from a previous run; restore the original one.
-+        if !config.status.enabled {
-+            let _ = crate::status::restore_original_description();
-+        }
-+
          let task_defs: Vec<(Box<dyn DaemonTask>, u32)> = vec![
              (Box::new(StatusTask::new()), 5),
              (Box::new(AutomationTask::new()), 10),
+@@ -28,7 +28,13 @@ impl Scheduler {
+         ];
+ 
+         let mut slots = Vec::with_capacity(task_defs.len());
+-        for (idx, (task, initial_delay)) in task_defs.into_iter().enumerate() {
++        for (idx, (mut task, initial_delay)) in task_defs.into_iter().enumerate() {
++            // Tasks that start disabled reconcile their side effects once
++            // (e.g. the status task must not leave a stale live description
++            // behind from a previous run).
++            if !task.is_enabled(config) {
++                task.on_disabled(config);
++            }
+             let tfd = create_timerfd()?;
+             arm_timerfd_oneshot(tfd, initial_delay);
+             super::epoll_add(epoll_fd, tfd, TAG_TASK_BASE + idx as u64)?;
 @@ -71,6 +77,14 @@ impl Scheduler {
      }
  
      pub fn reconfigure(&mut self, old: &Config, new: &Config) {
-+        // The moment the live description feature is switched off, put the
-+        // original module description back (the task no longer runs once it
-+        // is disabled, so this cannot be handled inside the task itself).
-+        if old.status.enabled && !new.status.enabled {
-+            tracing::info!("status task disabled, restoring original module description");
-+            let _ = crate::status::restore_original_description();
++        // Let tasks react to being switched off (the status task restores the
++        // original module description when live updates are disabled).
++        for slot in &mut self.slots {
++            if slot.task.is_enabled(old) && !slot.task.is_enabled(new) {
++                slot.task.on_disabled(new);
++            }
 +        }
 +
          for slot in &mut self.slots {
              if !slot.stagger_done {
                  continue;
+#diff --git a/rust/src/daemon/tasks.rs b/rust/src/daemon/tasks.rs
+index 0fe1894..a23ff09 100644
+--- a/rust/src/daemon/tasks.rs
++++ b/rust/src/daemon/tasks.rs
+@@ -13,6 +13,10 @@ pub trait DaemonTask {
+     fn is_enabled(&self, config: &Config) -> bool;
+     fn interval_secs(&self, config: &Config) -> u32;
+     fn run(&mut self, config: &Config, manager: Option<&str>) -> Result<(), TaskBackoff>;
++
++    /// Called when the task is or becomes disabled instead of being run.
++    /// Defaults to a no-op; tasks with external side effects override it.
++    fn on_disabled(&mut self, _config: &Config) {}
+ }
+ 
+ fn is_screen_off() -> bool {
+@@ -78,6 +82,16 @@ impl DaemonTask for StatusTask {
+ 
+         Ok(())
+     }
++
++    fn on_disabled(&mut self, _config: &Config) {
++        // Put the original module description back the moment the live status
++        // feature is switched off. Also drop the memoized live text so that
++        // re-enabling it rewrites the description immediately instead of
++        // waiting for some status value to change.
++        tracing::info!("status disabled, restoring original module description");
++        let _ = crate::status::restore_original_description();
++        self.last_description.clear();
++    }
+ }
+ 
+ // --- AutomationTask ---
