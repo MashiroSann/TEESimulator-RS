@@ -1,0 +1,235 @@
+# Patch: accept real-world keybox private keys and ECDSA curve/hash combos
+#
+# Upstream: Enginex0/tricky-addon-enhanced @ v5.53.1 (5c5e497)
+# Applies to: rust/src/keybox/validate.rs
+#
+# Fixes two validator false-negatives that make every common keybox fail the
+# fetch-time validation ("private key present but unparseable" /
+# "chain verification failed: hop 0 -> 1"):
+#   1. Private keys are now decoded from PEM to DER by the validator itself
+#      before handing them to RustCrypto. Real keyboxes ship SEC1
+#      ("BEGIN EC PRIVATE KEY") keys and/or single-line, >64-column base64
+#      bodies that the strict RustCrypto PEM readers reject.
+#   2. ECDSA verification now supports curve/hash combinations ring does not
+#      provide, e.g. an ecdsa-with-SHA256 certificate signed by a P-384
+#      issuer (via the p256/p384 crates' prehash verifiers).
+#
+# Both defects were verified against the Yurikey keybox and a working
+# device keybox: chains and keys verify with OpenSSL but were rejected by
+# the unpatched validator.
+#diff --git a/rust/src/keybox/validate.rs b/rust/src/keybox/validate.rs
+index f5950fa..15f7f93 100644
+--- a/rust/src/keybox/validate.rs
++++ b/rust/src/keybox/validate.rs
+@@ -432,11 +432,19 @@ fn verify_signature(
+         OID_RSA_SHA512 => do_verify(&signature::RSA_PKCS1_2048_8192_SHA512),
+         OID_ECDSA_SHA256 => match curve_oid(pubkey_alg).as_deref() {
+             Some(OID_CURVE_P256) => do_verify(&signature::ECDSA_P256_SHA256_ASN1),
++            // Real keyboxes sign P-384 leaves with ecdsa-with-SHA256; ring has
++            // no such combination, so verify it via RustCrypto.
++            Some(OID_CURVE_P384) => {
++                verify_ecdsa_prehash(pubkey_inner, tbs, sig, &ring::digest::SHA256, sig_alg_oid)
++            }
+             Some(other) => bail!("ECDSA-SHA256 with unsupported curve OID {other}"),
+             None => bail!("ECDSA-SHA256 missing curve OID"),
+         },
+         OID_ECDSA_SHA384 => match curve_oid(pubkey_alg).as_deref() {
+             Some(OID_CURVE_P384) => do_verify(&signature::ECDSA_P384_SHA384_ASN1),
++            Some(OID_CURVE_P256) => {
++                verify_ecdsa_prehash(pubkey_inner, tbs, sig, &ring::digest::SHA384, sig_alg_oid)
++            }
+             Some(other) => bail!("ECDSA-SHA384 with unsupported curve OID {other}"),
+             None => bail!("ECDSA-SHA384 missing curve OID"),
+         },
+@@ -446,6 +454,41 @@ fn verify_signature(
+     }
+ }
+ 
++/// ECDSA verification for curve/hash combinations ring does not provide.
++fn verify_ecdsa_prehash(
++    pubkey_inner: &[u8],
++    tbs: &[u8],
++    sig: &[u8],
++    digest_alg: &'static ring::digest::Algorithm,
++    sig_alg_oid: &str,
++) -> Result<()> {
++    let digest = ring::digest::digest(digest_alg, tbs);
++    let fail = |e: String| anyhow!("signature verification failed under {sig_alg_oid}: {e}");
++    match pubkey_inner.len() {
++        // Uncompressed P-256 point: 1 + 32 + 32
++        65 => {
++            use p256::ecdsa::signature::hazmat::PrehashVerifier;
++            use p256::ecdsa::{Signature, VerifyingKey};
++            let key =
++                VerifyingKey::from_sec1_bytes(pubkey_inner).map_err(|e| fail(e.to_string()))?;
++            let signature = Signature::from_der(sig).map_err(|e| fail(e.to_string()))?;
++            key.verify_prehash(digest.as_ref(), &signature)
++                .map_err(|e| fail(e.to_string()))
++        }
++        // Uncompressed P-384 point: 1 + 48 + 48
++        97 => {
++            use p384::ecdsa::signature::hazmat::PrehashVerifier;
++            use p384::ecdsa::{Signature, VerifyingKey};
++            let key =
++                VerifyingKey::from_sec1_bytes(pubkey_inner).map_err(|e| fail(e.to_string()))?;
++            let signature = Signature::from_der(sig).map_err(|e| fail(e.to_string()))?;
++            key.verify_prehash(digest.as_ref(), &signature)
++                .map_err(|e| fail(e.to_string()))
++        }
++        len => bail!("ECDSA key with unexpected uncompressed point length {len}"),
++    }
++}
++
+ fn curve_oid(alg: &AlgorithmIdentifier<'_>) -> Option<String> {
+     let params = alg.parameters.as_ref()?;
+     params.as_oid().ok().map(|oid| oid.to_id_string())
+@@ -497,15 +540,21 @@ fn match_private_key(
+     errors: &mut Vec<String>,
+ ) -> KeyMatch {
+     let leaf_spki = leaf.public_key().raw;
+-    let cleaned = strip_pem_indent(private_pem);
+ 
+-    if let Some(verdict) = try_match_rsa(&cleaned, leaf_spki, errors) {
+-        return verdict;
+-    }
+-    if let Some(verdict) = try_match_p256(&cleaned, leaf_spki, errors) {
++    // Decode the PEM body ourselves: real-world keyboxes ship single-line or
++    // >64-column base64 bodies that RustCrypto's strict PEM readers reject.
++    let der = match decode_pem_body(private_pem) {
++        Ok(der) => der,
++        Err(e) => {
++            errors.push(format!("private key PEM decode failed: {e}"));
++            return KeyMatch::Mismatched;
++        }
++    };
++
++    if let Some(verdict) = try_match_rsa(&der, leaf_spki, errors) {
+         return verdict;
+     }
+-    if let Some(verdict) = try_match_p384(&cleaned, leaf_spki, errors) {
++    if let Some(verdict) = try_match_ec(&der, leaf_spki, errors) {
+         return verdict;
+     }
+ 
+@@ -513,13 +562,13 @@ fn match_private_key(
+     KeyMatch::Mismatched
+ }
+ 
+-fn try_match_rsa(pem: &str, leaf_spki: &[u8], errors: &mut Vec<String>) -> Option<KeyMatch> {
++fn try_match_rsa(der: &[u8], leaf_spki: &[u8], errors: &mut Vec<String>) -> Option<KeyMatch> {
+     use rsa::pkcs1::DecodeRsaPrivateKey;
+     use rsa::pkcs8::{DecodePrivateKey, EncodePublicKey};
+     use rsa::{RsaPrivateKey, RsaPublicKey};
+ 
+-    let priv_key = RsaPrivateKey::from_pkcs8_pem(pem)
+-        .or_else(|_| RsaPrivateKey::from_pkcs1_pem(pem))
++    let priv_key = RsaPrivateKey::from_pkcs8_der(der)
++        .or_else(|_| RsaPrivateKey::from_pkcs1_der(der))
+         .ok()?;
+     let pub_key = RsaPublicKey::from(&priv_key);
+     match pub_key.to_public_key_der() {
+@@ -531,30 +580,86 @@ fn try_match_rsa(pem: &str, leaf_spki: &[u8], errors: &mut Vec<String>) -> Optio
+     }
+ }
+ 
+-fn try_match_p256(pem: &str, leaf_spki: &[u8], errors: &mut Vec<String>) -> Option<KeyMatch> {
+-    use p256::pkcs8::{DecodePrivateKey, EncodePublicKey};
+-    let priv_key = p256::SecretKey::from_pkcs8_pem(pem).ok()?;
+-    let pub_key = priv_key.public_key();
+-    match pub_key.to_public_key_der() {
+-        Ok(der) => Some(verdict(der.as_bytes(), leaf_spki)),
+-        Err(e) => {
+-            errors.push(format!("P-256 public-side DER encode failed: {e}"));
+-            Some(KeyMatch::Mismatched)
++/// EC keys come as PKCS#8 or as raw SEC1 (`BEGIN EC PRIVATE KEY`); RustCrypto
++/// accepts both once the wrapping is resolved ourselves.
++fn try_match_ec(der: &[u8], leaf_spki: &[u8], errors: &mut Vec<String>) -> Option<KeyMatch> {
++    use p256::pkcs8::{DecodePrivateKey as _, EncodePublicKey as _};
++
++    if let Ok(key) = p256::SecretKey::from_pkcs8_der(der) {
++        match key.public_key().to_public_key_der() {
++            Ok(pub_der) => return Some(verdict(pub_der.as_bytes(), leaf_spki)),
++            Err(e) => {
++                errors.push(format!("P-256 public-side DER encode failed: {e}"));
++                return Some(KeyMatch::Mismatched);
++            }
++        }
++    }
++    if let Ok(key) = p384::SecretKey::from_pkcs8_der(der) {
++        match key.public_key().to_public_key_der() {
++            Ok(pub_der) => return Some(verdict(pub_der.as_bytes(), leaf_spki)),
++            Err(e) => {
++                errors.push(format!("P-384 public-side DER encode failed: {e}"));
++                return Some(KeyMatch::Mismatched);
++            }
+         }
+     }
++    if let Some(scalar) = sec1_private_scalar(der) {
++        if let Ok(key) = p256::SecretKey::from_slice(&scalar) {
++            if let Ok(pub_der) = key.public_key().to_public_key_der() {
++                return Some(verdict(pub_der.as_bytes(), leaf_spki));
++            }
++        }
++        if let Ok(key) = p384::SecretKey::from_slice(&scalar) {
++            if let Ok(pub_der) = key.public_key().to_public_key_der() {
++                return Some(verdict(pub_der.as_bytes(), leaf_spki));
++            }
++        }
++    }
++    None
+ }
+ 
+-fn try_match_p384(pem: &str, leaf_spki: &[u8], errors: &mut Vec<String>) -> Option<KeyMatch> {
+-    use p384::pkcs8::{DecodePrivateKey, EncodePublicKey};
+-    let priv_key = p384::SecretKey::from_pkcs8_pem(pem).ok()?;
+-    let pub_key = priv_key.public_key();
+-    match pub_key.to_public_key_der() {
+-        Ok(der) => Some(verdict(der.as_bytes(), leaf_spki)),
+-        Err(e) => {
+-            errors.push(format!("P-384 public-side DER encode failed: {e}"));
+-            Some(KeyMatch::Mismatched)
++/// Extracts the private scalar from a SEC1 `ECPrivateKey` DER structure:
++/// SEQUENCE { INTEGER 1, OCTET STRING key, [0] curve, [1] publicKey }.
++fn sec1_private_scalar(der: &[u8]) -> Option<Vec<u8>> {
++    fn read_len(der: &[u8], pos: &mut usize) -> Option<usize> {
++        let first = *der.get(*pos)?;
++        *pos += 1;
++        if first & 0x80 == 0 {
++            return Some(first as usize);
++        }
++        let count = (first & 0x7f) as usize;
++        if count == 0 || count > 4 {
++            return None;
+         }
++        let mut len = 0usize;
++        for _ in 0..count {
++            len = (len << 8) | *der.get(*pos)? as usize;
++            *pos += 1;
++        }
++        Some(len)
++    }
++
++    let mut pos = 0usize;
++    if *der.get(pos)? != 0x30 {
++        return None;
++    }
++    pos += 1;
++    let _seq_len = read_len(der, &mut pos)?;
++    if *der.get(pos)? != 0x02 {
++        return None;
++    }
++    pos += 1;
++    let version_len = read_len(der, &mut pos)?;
++    pos = pos.checked_add(version_len)?;
++    if *der.get(pos)? != 0x04 {
++        return None;
+     }
++    pos += 1;
++    let key_len = read_len(der, &mut pos)?;
++    let end = pos.checked_add(key_len)?;
++    // SEC1 wraps the scalar; strip a leading zero pad if present.
++    let raw = der.get(pos..end)?;
++    Some(raw.to_vec())
+ }
+ 
+ fn verdict(derived_spki: &[u8], leaf_spki: &[u8]) -> KeyMatch {

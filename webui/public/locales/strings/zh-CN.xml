@@ -97,6 +97,7 @@
     <string name="enhanced_kb_fetch">立即获取</string>
     <string name="enhanced_kb_fetching">正在获取 keybox…</string>
     <string name="enhanced_keybox_ok">Keybox 已更新</string>
+    <string name="enhanced_kb_fetch_all_failed">所有远程 keybox 源均失败，已保留现有 keybox</string>
     <string name="enhanced_vb_enabled">启用 VBHash 伪装</string>
     <string name="enhanced_vb_hash">当前哈希</string>
     <string name="enhanced_vb_hash_none">无有效哈希</string>

@@ -97,6 +97,7 @@
     <string name="enhanced_kb_fetch">Fetch now</string>
     <string name="enhanced_kb_fetching">Fetching keybox…</string>
     <string name="enhanced_keybox_ok">Keybox updated</string>
+    <string name="enhanced_kb_fetch_all_failed">All remote keybox sources failed; the current keybox was kept</string>
     <string name="enhanced_vb_enabled">Enable VBHash spoofing</string>
     <string name="enhanced_vb_hash">Current hash</string>
     <string name="enhanced_vb_hash_none">no valid hash stored</string>

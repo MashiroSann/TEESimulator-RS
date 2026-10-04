@@ -25,7 +25,7 @@
 - **RSA-OAEP MGF1 遵循规范。** 省略 MGF1 digest 的操作默认使用 SHA-1；当密钥授权的 digest 集不含该值时，返回 `INCOMPATIBLE_MGF_DIGEST`（`-78`）；`Digest.NONE` 返回 `UNSUPPORTED_MGF_DIGEST`（`-79`）。对真实硬件密钥，生成时缓存其允许的 MGF1 digest 并在操作中执行同样规则，使宽松的厂商实现与严格的实现不可区分。
 - **内置 Tricky Addon WebUI。** 模块现捆绑 [Tricky Addon](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) 的 WebUI（上游 `cf16784`，v5.0-beta.4，Apache-2.0）。支持模块 WebUI 的 root 管理器（KernelSU、KernelSU Next、APatch）会在 Action 按钮旁显示第二个按钮，从 `webroot/` 提供：编辑目标列表、管理 `keybox.xml`（AOSP / 本地文件 / 社区仓库）、查看安全补丁设置。Action 按钮保留原有的持久化密钥管理。WebUI 能识别本 fork 并使用其 `target.txt` + `security_patch.txt` 布局，保存时保留每应用的 `[pkg]` 补丁段落。
 - **应用认证密钥由 keybox 签发。** 仅含 `PURPOSE_ATTEST_KEY` 的密钥即使没有 challenge 也由 keybox 签发（与真实硬件一致）。应用使用自生成的认证密钥对自身密钥认证时，证书链仍然连接到 Google 根，而不是自签的"未知根"。
-- **内置自动化后端。** 模块 zip 现内置 [Tricky Addon Enhanced](https://github.com/Enginex0/tricky-addon-enhanced) 后端（GPL-3.0，固定 `v5.53.1`，打包时从源码交叉编译 arm64-v8a；见 `.github/ta-enhanced.json`）。安装后它作为守护进程运行在引擎旁边，自动化 keybox 轮换（Yurikey / KOW / 自定义）、安全补丁日期、VBHash 伪装、基于 inotify 的目标列表管理与冲突报告，还能在管理器的模块描述里实时显示状态。全部功能在自带 WebUI 中控制（⋮ 菜单 → **Enhanced**）。它对冲突模块只报告、绝不自动删除。
+- **内置自动化后端。** 模块 zip 现内置 [Tricky Addon Enhanced](https://github.com/Enginex0/tricky-addon-enhanced) 后端（GPL-3.0，固定 `v5.53.1`，并附带 `patches/ta-enhanced/` 中的小型校验器兼容补丁，打包时从源码交叉编译 arm64-v8a；见 `.github/ta-enhanced.json`）。安装后它作为守护进程运行在引擎旁边，自动化 keybox 轮换（Yurikey / KOW / 自定义）、安全补丁日期、VBHash 伪装、基于 inotify 的目标列表管理与冲突报告，还能在管理器的模块描述里实时显示状态。全部功能在自带 WebUI 中控制（⋮ 菜单 → **Enhanced**）。它对冲突模块只报告、绝不自动删除。
 
 ## 它做什么
 

@@ -21,6 +21,7 @@ must point at an SDK with the patched NDK.
 """
 
 import argparse
+import glob
 import hashlib
 import json
 import os
@@ -33,6 +34,7 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PIN_FILE = os.path.join(ROOT, ".github", "ta-enhanced.json")
+PATCH_DIR = os.path.join(ROOT, "patches", "ta-enhanced")
 CACHE_DIR = os.path.join(ROOT, ".cache")
 STAGE_DIR = os.path.join(ROOT, "module", "taenh")
 STAGE_BIN_DIR = os.path.join(STAGE_DIR, "arm64-v8a")
@@ -109,6 +111,46 @@ def find_ndk() -> str:
     return ""  # unreachable
 
 
+def patch_files() -> list:
+    return sorted(glob.glob(os.path.join(PATCH_DIR, "*.patch")))
+
+
+def patch_fingerprint() -> str:
+    files = patch_files()
+    if not files:
+        return "nopatch"
+    digest = hashlib.sha256()
+    for path in files:
+        with open(path, "rb") as f:
+            digest.update(f.read())
+    return digest.hexdigest()[:16]
+
+
+def apply_patches(src_dir: str) -> None:
+    for path in patch_files():
+        name = os.path.basename(path)
+        reverse = subprocess.run(
+            ["git", "apply", "--reverse", "--check", path],
+            cwd=src_dir,
+            capture_output=True,
+            text=True,
+        )
+        if reverse.returncode == 0:
+            continue  # already applied
+        check = subprocess.run(
+            ["git", "apply", "--check", path],
+            cwd=src_dir,
+            capture_output=True,
+            text=True,
+        )
+        if check.returncode != 0:
+            die(f"{name} does not apply: {check.stderr.strip()}")
+        applied = subprocess.run(["git", "apply", path], cwd=src_dir)
+        if applied.returncode != 0:
+            die(f"{name} failed to apply")
+        log(f"applied {name}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip", action="store_true")
@@ -129,9 +171,10 @@ def main() -> None:
 
     marker = os.path.join(STAGE_DIR, ".pin")
     staged_bin = os.path.join(STAGE_BIN_DIR, "ta-enhanced")
+    marker_expected = f"{commit} {patch_fingerprint()}"
     if not args.force and os.path.isfile(staged_bin) and os.path.isfile(marker):
         with open(marker, encoding="utf-8") as f:
-            if f.read().strip() == commit:
+            if f.read().strip() == marker_expected:
                 log(f"backend already staged for {tag} ({commit[:7]})")
                 return
 
@@ -161,7 +204,14 @@ def main() -> None:
     # --- source tree -------------------------------------------------------
     src_dir = os.path.join(CACHE_DIR, f"tae-src-{commit}")
     cargo_toml = os.path.join(src_dir, "rust", "Cargo.toml")
-    if args.force or not os.path.isfile(cargo_toml):
+    fp_file = os.path.join(src_dir, ".tae-patch-fp")
+    current_fp = patch_fingerprint()
+    cached_fp = ""
+    if os.path.isfile(fp_file):
+        with open(fp_file, encoding="utf-8") as f:
+            cached_fp = f.read().strip()
+    src_ok = os.path.isfile(cargo_toml) and cached_fp == current_fp
+    if args.force or not src_ok:
         if os.path.isdir(src_dir):
             shutil.rmtree(src_dir, ignore_errors=True)
         os.makedirs(src_dir, exist_ok=True)
@@ -180,6 +230,9 @@ def main() -> None:
                     tar.extract(member, src_dir, filter="data")
         if not os.path.isfile(cargo_toml):
             die("source extraction incomplete (rust/Cargo.toml missing)")
+        apply_patches(src_dir)
+        with open(fp_file, "w", encoding="utf-8") as f:
+            f.write(current_fp + "\n")
 
     # --- build -------------------------------------------------------------
     abi = pin["abi"]
@@ -205,7 +258,7 @@ def main() -> None:
             os.chmod(path, 0o755)
 
     with open(marker, "w", encoding="utf-8") as f:
-        f.write(commit + "\n")
+        f.write(marker_expected + "\n")
 
     log(f"staged {tag} ({commit[:7]}) -> module/taenh/")
     log(f"  ta-enhanced : {os.path.getsize(staged_bin)} bytes")

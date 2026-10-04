@@ -109,13 +109,28 @@ export class TaEnhanced {
     }
   }
 
-  async keyboxFetch(): Promise<boolean> {
+  /**
+   * Manual keybox fetch. Exit code 0 with "keybox fetched from existing" means
+   * every remote source failed and the daemon kept the current keybox, so that
+   * must be reported as a failure with the failing sources for context.
+   */
+  async keyboxFetch(): Promise<{ ok: boolean; detail?: string }> {
     const bin = await this.#binary()
     try {
       const result = await exec(`'${bin}' keybox fetch 2>&1`)
-      return result.errno === 0
-    } catch {
-      return false
+      const output = result.stdout
+      if (result.errno !== 0) {
+        const line = output.trim().split('\n').filter(Boolean).pop()
+        return { ok: false, detail: line }
+      }
+      if (output.includes('fetched from existing')) {
+        const failed = [...output.matchAll(/keybox from (\w+) (?:rejected|parse failed)/g)].map(m => m[1])
+        return { ok: false, detail: failed.length ? failed.join(', ') : 'all remote sources failed' }
+      }
+      const source = output.match(/keybox fetched from (\w+)/)?.[1]
+      return { ok: true, detail: source }
+    } catch (e) {
+      return { ok: false, detail: String(e) }
     }
   }
 

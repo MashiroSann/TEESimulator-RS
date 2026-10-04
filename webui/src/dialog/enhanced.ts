@@ -48,7 +48,7 @@ export class EnhancedDialog {
               </label>
               <md-outlined-select id="enh-kb-source" label="${i18n.t('enhanced_kb_source')}">
                 <md-select-option value="yurikey"><div slot="headline">Yurikey</div></md-select-option>
-                <md-select-option value="kow"><div slot="headline">KOW</div></md-select-option>
+                <md-select-option value="upstream"><div slot="headline">Upstream (KOW)</div></md-select-option>
                 <md-select-option value="custom"><div slot="headline">Custom</div></md-select-option>
               </md-outlined-select>
               <div id="enh-kb-status" class="enhanced-grid"></div>
@@ -145,8 +145,13 @@ export class EnhancedDialog {
 
     fragment.querySelector<HTMLElement>('#enh-kb-fetch')!.onclick = async () => {
       this.#snackbar.show(i18n.t('enhanced_kb_fetching'))
-      const ok = await this.#api.keyboxFetch()
-      this.#snackbar.show(i18n.t(ok ? 'enhanced_keybox_ok' : 'enhanced_action_failed'), ok)
+      const result = await this.#api.keyboxFetch()
+      if (result.ok) {
+        this.#snackbar.show(i18n.t('enhanced_keybox_ok'))
+      } else {
+        console.warn('[enhanced] keybox fetch failed:', result.detail)
+        this.#snackbar.show(i18n.t('enhanced_kb_fetch_all_failed'), false)
+      }
       await this.refresh()
     }
 
