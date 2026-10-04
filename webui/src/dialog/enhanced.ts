@@ -43,6 +43,15 @@ export class EnhancedDialog {
               <div id="enh-status" class="enhanced-grid"></div>
             </section>
             <section class="enhanced-section">
+              <h4>${i18n.t('enhanced_section_patch')}</h4>
+              <label class="switch-item outlined" for="enh-sp-enabled">
+                <md-ripple></md-ripple>
+                <span>${i18n.t('enhanced_sp_auto')}</span>
+                <md-switch icons="true" id="enh-sp-enabled" class="enh-switch" data-key="security_patch.auto_update"></md-switch>
+              </label>
+              <md-outlined-text-field id="enh-sp-date" label="${i18n.t('enhanced_sp_custom')}" placeholder="YYYY-MM-DD" autocapitalize="none"></md-outlined-text-field>
+            </section>
+            <section class="enhanced-section">
               <h4>${i18n.t('enhanced_section_keybox')}</h4>
               <label class="switch-item outlined" for="enh-kb-enabled">
                 <md-ripple></md-ripple>
@@ -144,6 +153,16 @@ export class EnhancedDialog {
     intervalInput.addEventListener('change', () => {
       const seconds = parseInt(intervalInput.value, 10)
       if (Number.isFinite(seconds) && seconds >= 60) this.#saveConfig('keybox.interval', String(seconds))
+    })
+
+    const spDateInput = fragment.querySelector<MdOutlinedTextField>('#enh-sp-date')!
+    spDateInput.addEventListener('change', () => {
+      const value = spDateInput.value.trim()
+      if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        this.#snackbar.show(i18n.t('enhanced_save_failed'), false)
+        return
+      }
+      void this.#saveConfig('security_patch.custom_date', value)
     })
 
     fragment.querySelector<HTMLElement>('#enh-kb-fetch')!.onclick = async () => {
@@ -250,6 +269,11 @@ export class EnhancedDialog {
     if (urlInput) urlInput.value = data.config.keybox.custom_url ?? ''
     const intervalInput = this.#dialog?.querySelector<MdOutlinedTextField>('#enh-kb-interval')
     if (intervalInput) intervalInput.value = String(data.config.keybox.interval ?? 86400)
+
+    // Security patch
+    this.#setSwitch('#enh-sp-enabled', data.config.security_patch.auto_update)
+    const spDateInput = this.#dialog?.querySelector<MdOutlinedTextField>('#enh-sp-date')
+    if (spDateInput) spDateInput.value = data.config.security_patch.custom_date ?? ''
 
     // VBHash
     this.#setSwitch('#enh-vb-enabled', data.config.vbhash.enabled)

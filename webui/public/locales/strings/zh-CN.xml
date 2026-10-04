@@ -79,6 +79,9 @@
     <string name="enhanced_unavailable">内置增强后端不可用（仅支持 arm64，且构建需包含后端）。</string>
     <string name="enhanced_loading">加载中&#8230;</string>
     <string name="enhanced_section_status">状态</string>
+    <string name="enhanced_section_patch">安全补丁级别</string>
+    <string name="enhanced_sp_auto">自动更新为最新补丁</string>
+    <string name="enhanced_sp_custom">强制自定义日期（YYYY-MM-DD，留空为自动）</string>
     <string name="enhanced_section_keybox">Keybox 轮换</string>
     <string name="enhanced_section_vbhash">VBHash 伪装</string>
     <string name="enhanced_section_advanced">高级</string>

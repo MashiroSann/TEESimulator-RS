@@ -228,9 +228,10 @@ else
       rm -f "$MODPATH/more-exclude.json"
     fi
 
-    ui_print "- Refreshing security patch dates"
-    "$TAENH_BIN" security-patch update --force 2>/dev/null \
-      || ui_print "! Security patch update failed (daemon retries at boot)"
+    # Security patch dates are intentionally left as-is on (re)install: the
+    # backend applies them per its own config (security_patch.auto_update /
+    # custom_date) from the daemon at boot. A forced bulletin refresh here
+    # used to clobber the user's chosen date on every reinstall.
 
     if [ ! -f "$CONFIG_DIR/keybox.xml" ]; then
       if timeout 3 ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; then

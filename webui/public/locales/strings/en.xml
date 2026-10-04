@@ -79,6 +79,9 @@
     <string name="enhanced_unavailable">The embedded enhanced backend is unavailable (arm64 only, and the build must include it).</string>
     <string name="enhanced_loading">Loading&#8230;</string>
     <string name="enhanced_section_status">Status</string>
+    <string name="enhanced_section_patch">Security patch level</string>
+    <string name="enhanced_sp_auto">Auto-update to the latest patch</string>
+    <string name="enhanced_sp_custom">Enforced custom date (YYYY-MM-DD, empty = auto)</string>
     <string name="enhanced_section_keybox">Keybox rotation</string>
     <string name="enhanced_section_vbhash">VBHash spoofing</string>
     <string name="enhanced_section_advanced">Advanced</string>
