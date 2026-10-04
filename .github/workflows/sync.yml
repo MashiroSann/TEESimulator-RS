@@ -11,7 +11,8 @@ name: Sync Upstreams
 #        the customized ones listed in .github/upstream-state.json).
 #   3. Build the debug branch (reuses .github/workflows/build.yml).
 #   4. Publish: push `debug`, open/update a PR to main, create a pre-release
-#      (tag v<version>-pre) with both zips. update.json is NOT touched here;
+#      (tag v<version>-pre) with all zips (Release/Debug, each with and
+#      without the bundled enhanced backend). update.json is NOT touched here;
 #      the stable release happens via release.yml after the PR is merged.
 #
 # Conflicts or failures open/comment an issue labeled `upstream-sync`.
@@ -379,7 +380,9 @@ jobs:
             --prerelease \
             --notes-file /tmp/notes.md \
             artifacts/TEESimulator-RS-*-Release.zip \
-            artifacts/TEESimulator-RS-*-Debug.zip
+            artifacts/TEESimulator-RS-*-Release-lite.zip \
+            artifacts/TEESimulator-RS-*-Debug.zip \
+            artifacts/TEESimulator-RS-*-Debug-lite.zip
 
   notify-failure:
     needs: [sync, build, publish]

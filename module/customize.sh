@@ -40,6 +40,7 @@ if [ "$_ui_lang" = "zh" ]; then
   MSG_DEF_SP="- 正在添加默认安全补丁配置（跟随设备属性）"
   MSG_HBK="- 正在生成设备唯一硬件绑定密钥种子"
   MSG_ENH_SKIP="- 已跳过增强后端（仅支持 arm64-v8a）"
+  MSG_ENH_LITE="- 此版本为 Lite 版（不含增强后端）"
   MSG_ENH_MISS="! zip 中缺少增强后端（构建未包含？）"
   MSG_ENH_INSTALL="- 正在安装 Tricky Addon Enhanced 后端"
   MSG_ENH_FAIL="! 增强后端无法运行；跳过其配置"
@@ -82,6 +83,7 @@ else
   MSG_DEF_SP="- Adding default security patch config (mirror device props)"
   MSG_HBK="- Generating device-unique hardware-bound key seed"
   MSG_ENH_SKIP="- Enhanced backend skipped (arm64-v8a only)"
+  MSG_ENH_LITE="- Lite build: the enhanced backend is not bundled"
   MSG_ENH_MISS="! Enhanced backend missing from zip (built without backend?)"
   MSG_ENH_INSTALL="- Installing Tricky Addon Enhanced backend"
   MSG_ENH_FAIL="! Enhanced backend failed to run; skipping its setup"
@@ -275,10 +277,21 @@ fi
 # English and is intentionally left untouched.
 TAENH_DIR="$MODPATH/taenh"
 TAENH_BIN="$TAENH_DIR/arm64-v8a/ta-enhanced"
+
+# The lite build intentionally ships without module/taenh and drops a marker
+# so the absence is reported as a variant, not as a broken build.
+unzip -qqjo "$ZIPFILE" ".lite" -d "$MODPATH" 2>/dev/null
+_LITE=0; [ -f "$MODPATH/.lite" ] && _LITE=1
+rm -f "$MODPATH/.lite"
+
 if [ "$ARCH" != "arm64" ]; then
   ui_print "$(msg ENH_SKIP)"
 elif ! unzip -l "$ZIPFILE" | grep -q "taenh/arm64-v8a/ta-enhanced"; then
-  ui_print "$(msg ENH_MISS)"
+  if [ "$_LITE" = "1" ]; then
+    ui_print "$(msg ENH_LITE)"
+  else
+    ui_print "$(msg ENH_MISS)"
+  fi
 else
   ui_print ""
   ui_print "$(msg ENH_INSTALL)"

@@ -154,107 +154,132 @@ androidComponents {
         val capitalized = variant.name.replaceFirstChar { it.uppercase() }
         val isDebug = variant.buildType == "debug"
 
-        // --- Define output locations and file names ---
-        // Stage all files in a temporary directory inside 'build' before zipping
-        val tempModuleDir = project.layout.buildDirectory.dir("module/${variant.name}")
-        val zipFileName = "TEESimulator-RS-$verName-$gitCommitCount-$capitalized.zip"
+        // --- Module zip variants ---------------------------------------------
+        // Every build produces two zips per build type: the full module and a
+        // "lite" one shipping the same module without module/taenh (no bundled
+        // enhanced backend). Local builds, CI artifacts and releases all carry
+        // both variants.
+        val sourceModuleDir = rootProject.projectDir.resolve("module")
 
-        // Task 1: Prepare all module files in the temporary build directory.
-        // Using Sync ensures that stale files from previous runs are removed.
-        val prepareModuleFilesTask =
-            tasks.register<Sync>("prepareModuleFiles${capitalized}") {
-                group = "TEESimulator-RS Module Packaging"
-                description = "Prepares all files for the ${variant.name} module zip."
+        fun registerModuleZip(lite: Boolean): TaskProvider<Zip> {
+            val taskSuffix = if (lite) "Lite" else ""
+            val fileSuffix = if (lite) "-lite" else ""
+            val tempModuleDir =
+                project.layout.buildDirectory.dir("module/${variant.name}$fileSuffix")
+            val fileName =
+                "TEESimulator-RS-$verName-$gitCommitCount-$capitalized$fileSuffix.zip"
 
-                if (isDebug) {
-                    dependsOn("package${capitalized}")
-                } else {
-                    dependsOn("minify${capitalized}WithR8")
-                    dependsOn("strip${capitalized}DebugSymbols")
-                }
-                dependsOn(buildRustCertgen)
-                dependsOn(refreshUpdateJson)
+            // Task 1: Prepare all module files in the temporary build directory.
+            // Using Sync ensures that stale files from previous runs are removed.
+            val prepareModuleFilesTask =
+                tasks.register<Sync>("prepareModuleFiles${capitalized}$taskSuffix") {
+                    group = "TEESimulator-RS Module Packaging"
+                    description =
+                        "Prepares all files for the ${variant.name}$fileSuffix module zip."
 
-                if (isDebug) {
-                    from(variant.artifacts.get(SingleArtifact.APK)) {
-                        include("*.apk")
-                        rename { "service.apk" }
-                    }
-                } else {
-                    from(
-                        project.layout.buildDirectory.dir(
-                            "intermediates/dex/${variant.name}/minify${capitalized}WithR8"
-                        )
-                    ) {
-                        include("classes.dex")
-                    }
-                }
-
-                val nativeLibsDir =
                     if (isDebug) {
-                        "intermediates/merged_native_libs/${variant.name}/merge${capitalized}NativeLibs/out/lib"
+                        dependsOn("package${capitalized}")
                     } else {
-                        "intermediates/stripped_native_libs/${variant.name}/strip${capitalized}DebugSymbols/out/lib"
+                        dependsOn("minify${capitalized}WithR8")
+                        dependsOn("strip${capitalized}DebugSymbols")
                     }
-                from(project.layout.buildDirectory.dir(nativeLibsDir)) {
-                    into("lib")
-                    include(
-                        "**/libinject.so",
-                        "**/libTEESimulator.so",
-                        "**/libsupervisor.so",
-                        "**/libcertgen.so",
-                    )
-                }
+                    dependsOn(buildRustCertgen)
+                    dependsOn(refreshUpdateJson)
 
-                // Now, copy and process the files from 'module' directory.
-                val sourceModuleDir = rootProject.projectDir.resolve("module")
-                from(sourceModuleDir) {
-                    exclude("module.prop") // Exclude the template file.
-                    exclude("diag.sh") // Debug-only diagnostic plane; included for debug below.
-                }
-
-                // Copy and filter the module.prop template separately.
-                from(sourceModuleDir) {
-                    include("module.prop")
-                    // Use expand() for simple key-value replacement.
-                    expand(
-                        "REPLACEMEVERCODE" to gitCommitCount.toString(),
-                        "REPLACEMEVER" to "$verName-$gitCommitCount",
-                    )
-                }
-
-                if (isDebug) {
-                    from(sourceModuleDir) { include("diag.sh") }
-                }
-
-                // The destination for all the above 'from' operations.
-                into(tempModuleDir)
-
-                if (isDebug) {
-                    doLast {
-                        // Debug-only: grant the keystore + soterserver (platform_app) domains
-                        // external-storage access for the per-UID NDJSON sink. diag.sh (shipped
-                        // only in debug) carries the shell side of the diagnostic plane.
-                        tempModuleDir.get().asFile.resolve("sepolicy.rule")
-                            .appendText(
-                                "\nallow keystore media_rw_data_file { dir file } *" +
-                                    "\nallow platform_app media_rw_data_file { dir file } *\n",
+                    if (isDebug) {
+                        from(variant.artifacts.get(SingleArtifact.APK)) {
+                            include("*.apk")
+                            rename { "service.apk" }
+                        }
+                    } else {
+                        from(
+                            project.layout.buildDirectory.dir(
+                                "intermediates/dex/${variant.name}/minify${capitalized}WithR8"
                             )
+                        ) {
+                            include("classes.dex")
+                        }
+                    }
+
+                    val nativeLibsDir =
+                        if (isDebug) {
+                            "intermediates/merged_native_libs/${variant.name}/merge${capitalized}NativeLibs/out/lib"
+                        } else {
+                            "intermediates/stripped_native_libs/${variant.name}/strip${capitalized}DebugSymbols/out/lib"
+                        }
+                    from(project.layout.buildDirectory.dir(nativeLibsDir)) {
+                        into("lib")
+                        include(
+                            "**/libinject.so",
+                            "**/libTEESimulator.so",
+                            "**/libsupervisor.so",
+                            "**/libcertgen.so",
+                        )
+                    }
+
+                    // Now, copy and process the files from 'module' directory.
+                    from(sourceModuleDir) {
+                        exclude("module.prop") // Exclude the template file.
+                        exclude("diag.sh") // Debug-only diagnostic plane; included for debug below.
+                        if (lite) exclude("taenh/**") // Lite build: no bundled enhanced backend.
+                    }
+
+                    // Copy and filter the module.prop template separately.
+                    from(sourceModuleDir) {
+                        include("module.prop")
+                        // Use expand() for simple key-value replacement.
+                        expand(
+                            "REPLACEMEVERCODE" to gitCommitCount.toString(),
+                            "REPLACEMEVER" to "$verName-$gitCommitCount",
+                        )
+                    }
+
+                    if (isDebug) {
+                        from(sourceModuleDir) { include("diag.sh") }
+                    }
+
+                    // The destination for all the above 'from' operations.
+                    into(tempModuleDir)
+
+                    if (isDebug) {
+                        doLast {
+                            // Debug-only: grant the keystore + soterserver (platform_app) domains
+                            // external-storage access for the per-UID NDJSON sink. diag.sh (shipped
+                            // only in debug) carries the shell side of the diagnostic plane.
+                            tempModuleDir.get().asFile.resolve("sepolicy.rule")
+                                .appendText(
+                                    "\nallow keystore media_rw_data_file { dir file } *" +
+                                        "\nallow platform_app media_rw_data_file { dir file } *\n",
+                                )
+                        }
+                    }
+
+                    if (lite) {
+                        doLast {
+                            // Marker consumed by customize.sh so a deliberate
+                            // backend-less build is not reported as broken.
+                            tempModuleDir.get().asFile.resolve(".lite").writeText("")
+                        }
                     }
                 }
-            }
 
-        // Task 2: Zip the prepared files from the temporary directory.
-        val zipTask =
-            tasks.register<Zip>("zip${capitalized}") {
+            // Task 2: Zip the prepared files from the temporary directory.
+            return tasks.register<Zip>("zip${capitalized}$taskSuffix") {
                 group = "TEESimulator-RS Module Packaging"
-                description = "Creates the flashable zip for the ${variant.name} module."
+                description = "Creates the flashable zip for the ${variant.name}$fileSuffix module."
                 dependsOn(prepareModuleFilesTask)
 
-                archiveFileName.set(zipFileName)
+                archiveFileName.set(fileName)
                 destinationDirectory.set(project.rootDir.resolve("out"))
                 from(tempModuleDir) // Zip the entire contents of the staging directory.
             }
+        }
+
+        // Full-zip file name: reused by the install/push tasks below.
+        val zipFileName = "TEESimulator-RS-$verName-$gitCommitCount-$capitalized.zip"
+
+        val zipTask = registerModuleZip(lite = false)
+        registerModuleZip(lite = true)
 
         // Task 3: A helper function to create installation tasks for different root providers.
         fun createInstallTasks(rootProvider: String, installCli: String) {

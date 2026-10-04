@@ -5,7 +5,8 @@ name: Release
 # Flow:
 #   1. Build main via the reusable build workflow (WebUI + Release/Debug zips).
 #   2. Create the GitHub release tagged with the version embedded in the zips
-#      (v6.0.1-<count+5>), marked --latest, with both zips attached.
+#      (v6.0.1-<count+5>), marked --latest, with all four zips attached
+#      (Release/Debug, each with and without the bundled enhanced backend).
 #   3. Commit the gradle-generated module/update.json and the upstream
 #      lastReleased markers back to main with [skip ci].
 #
@@ -106,7 +107,9 @@ jobs:
             --latest \
             --notes-file /tmp/notes.md \
             artifacts/TEESimulator-RS-"$VER"-Release.zip \
-            artifacts/TEESimulator-RS-"$VER"-Debug.zip
+            artifacts/TEESimulator-RS-"$VER"-Release-lite.zip \
+            artifacts/TEESimulator-RS-"$VER"-Debug.zip \
+            artifacts/TEESimulator-RS-"$VER"-Debug-lite.zip
 
       - name: Commit update.json and released markers
         if: steps.ver.outputs.exists == 'no'

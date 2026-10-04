@@ -143,7 +143,7 @@ jobs:
       - name: Build with Gradle
         run: |
           chmod +x ./gradlew
-          ./gradlew zipRelease zipDebug -Porg.gradle.parallel=true -Porg.gradle.vfs.watch=true -Dorg.gradle.jvmargs=-Xmx2048m
+          ./gradlew zipRelease zipDebug zipReleaseLite zipDebugLite -Porg.gradle.parallel=true -Porg.gradle.vfs.watch=true -Dorg.gradle.jvmargs=-Xmx2048m
 
       - name: Parse version from release zip
         id: version
@@ -157,20 +157,23 @@ jobs:
 
       - name: List build artifacts
         run: |
-          echo "Release: $(ls out/*Release*.zip | head -1) ($(du -h out/*Release*.zip | head -1 | cut -f1))"
-          echo "Debug: $(ls out/*Debug*.zip | head -1) ($(du -h out/*Debug*.zip | head -1 | cut -f1))"
+          ls -lh out/*.zip
 
       - uses: actions/upload-artifact@v7
         with:
           name: TEESimulator-RS-release-zip
-          path: out/TEESimulator-RS-*-Release.zip
+          path: |
+            out/TEESimulator-RS-*-Release.zip
+            out/TEESimulator-RS-*-Release-lite.zip
           retention-days: 30
           compression-level: 0
 
       - uses: actions/upload-artifact@v7
         with:
           name: TEESimulator-RS-debug-zip
-          path: out/TEESimulator-RS-*-Debug.zip
+          path: |
+            out/TEESimulator-RS-*-Debug.zip
+            out/TEESimulator-RS-*-Debug-lite.zip
           retention-days: 7
           compression-level: 0
 
