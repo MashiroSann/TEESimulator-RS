@@ -4,4 +4,4 @@ version=${REPLACEMEVER}
 versionCode=${REPLACEMEVERCODE}
 author=JingMatrix, Enginex0, KOWX712
 description=Software simulation for Android hardware-backed key pairs with key attestation; bundles the Tricky Addon WebUI for target list and keybox management
-updateJson=https://raw.githubusercontent.com/MashiroSann/TEESimulator-RS/main/module/update.json
+updateJson=${REPLACEMEUPDATEJSON}

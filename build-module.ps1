@@ -12,8 +12,8 @@
       - KeyMintSecurityLevelInterceptor.kt : 锻造异常不再一律压成 -49，SSE 错误码原样透传
       - SoftwareOperation.kt               : 修正 INCOMPATIBLE_PURPOSE / UNSUPPORTED_PURPOSE 兜底值
 
-    产物：out\TEESimulator-RS-<版本>-<commit>-Release-Enh.zip（含增强后端）
-          以及同名的 -Release-NoEnh.zip（不含增强后端）；默认同时编 Debug 的两种。
+    产物：out\TEESimulator-RS-<版本>-<commit>-Release-Enhanced.zip（含增强后端）
+          以及同名的 -Release-NoEnhanced.zip（不含增强后端）；默认同时编 Debug 的两种。
 
 .PARAMETER ReleaseOnly
     只编 Release（默认 Release + Debug 都编）。
@@ -215,9 +215,9 @@ if (-not $SkipTaEnhanced) {
 $tasks = @()
 if ($Clean) { $tasks += 'clean' }
 if ($ReleaseOnly) {
-    $tasks += @('zipRelease', 'zipReleaseNoEnh')
+    $tasks += @('zipRelease', 'zipReleaseNoEnhanced')
 } else {
-    $tasks += @('zipRelease', 'zipDebug', 'zipReleaseNoEnh', 'zipDebugNoEnh')
+    $tasks += @('zipRelease', 'zipDebug', 'zipReleaseNoEnhanced', 'zipDebugNoEnhanced')
 }
 
 $gradleArgs = $tasks + @('--console=plain')

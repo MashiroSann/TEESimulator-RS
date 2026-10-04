@@ -143,15 +143,15 @@ jobs:
       - name: Build with Gradle
         run: |
           chmod +x ./gradlew
-          ./gradlew zipRelease zipDebug zipReleaseNoEnh zipDebugNoEnh -Porg.gradle.parallel=true -Porg.gradle.vfs.watch=true -Dorg.gradle.jvmargs=-Xmx2048m
+          ./gradlew zipRelease zipDebug zipReleaseNoEnhanced zipDebugNoEnhanced -Porg.gradle.parallel=true -Porg.gradle.vfs.watch=true -Dorg.gradle.jvmargs=-Xmx2048m
 
       - name: Parse version from release zip
         id: version
         run: |
-          release_zip=$(ls out/TEESimulator-RS-*-Release-Enh.zip | head -1)
-          base=$(basename "$release_zip" .zip)      # TEESimulator-RS-v6.0.1-312-Release-Enh
-          version=${base#TEESimulator-RS-}          # v6.0.1-312-Release-Enh
-          version=${version%-Release-Enh}           # v6.0.1-312
+          release_zip=$(ls out/TEESimulator-RS-*-Release-Enhanced.zip | head -1)
+          base=$(basename "$release_zip" .zip)      # v6.0.1-312-Release-Enhanced suffix
+          version=${base#TEESimulator-RS-}          # v6.0.1-312-Release-Enhanced
+          version=${version%-Release-Enhanced}      # v6.0.1-312
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Version: $version"
 
@@ -163,8 +163,8 @@ jobs:
         with:
           name: TEESimulator-RS-release-zip
           path: |
-            out/TEESimulator-RS-*-Release-Enh.zip
-            out/TEESimulator-RS-*-Release-NoEnh.zip
+            out/TEESimulator-RS-*-Release-Enhanced.zip
+            out/TEESimulator-RS-*-Release-NoEnhanced.zip
           retention-days: 30
           compression-level: 0
 
@@ -172,8 +172,8 @@ jobs:
         with:
           name: TEESimulator-RS-debug-zip
           path: |
-            out/TEESimulator-RS-*-Debug-Enh.zip
-            out/TEESimulator-RS-*-Debug-NoEnh.zip
+            out/TEESimulator-RS-*-Debug-Enhanced.zip
+            out/TEESimulator-RS-*-Debug-NoEnhanced.zip
           retention-days: 7
           compression-level: 0
 
@@ -189,5 +189,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: module-update-json
-          path: module/update.json
+          path: |
+            module/update.json
+            module/update-noenh.json
           retention-days: 30

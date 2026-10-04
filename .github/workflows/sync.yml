@@ -379,10 +379,10 @@ jobs:
             --title "$VER (pre-release)" \
             --prerelease \
             --notes-file /tmp/notes.md \
-            artifacts/TEESimulator-RS-*-Release-Enh.zip \
-            artifacts/TEESimulator-RS-*-Release-NoEnh.zip \
-            artifacts/TEESimulator-RS-*-Debug-Enh.zip \
-            artifacts/TEESimulator-RS-*-Debug-NoEnh.zip
+            artifacts/TEESimulator-RS-*-Release-Enhanced.zip \
+            artifacts/TEESimulator-RS-*-Release-NoEnhanced.zip \
+            artifacts/TEESimulator-RS-*-Debug-Enhanced.zip \
+            artifacts/TEESimulator-RS-*-Debug-NoEnhanced.zip
 
   notify-failure:
     needs: [sync, build, publish]

@@ -128,24 +128,27 @@ val refreshUpdateJson by
         description = "Rewrite module/update.json to match current verName and gitCommitCount."
 
         val updateJsonFile = rootProject.projectDir.resolve("module/update.json")
+        val noenhUpdateJsonFile = rootProject.projectDir.resolve("module/update-noenh.json")
         val capturedVerName = verName
         val capturedCount = gitCommitCount
 
         inputs.property("verName", capturedVerName)
         inputs.property("gitCommitCount", capturedCount)
         outputs.file(updateJsonFile)
+        outputs.file(noenhUpdateJsonFile)
 
         doLast {
             val fullVer = "$capturedVerName-$capturedCount"
-            updateJsonFile.writeText(
+            fun manifest(zipFileName: String) =
                 """{
   "version": "$fullVer",
   "versionCode": $capturedCount,
-  "zipUrl": "https://github.com/MashiroSann/TEESimulator-RS/releases/download/$fullVer/TEESimulator-RS-$fullVer-Release-Enh.zip",
+  "zipUrl": "https://github.com/MashiroSann/TEESimulator-RS/releases/download/$fullVer/$zipFileName",
   "changelog": "https://raw.githubusercontent.com/MashiroSann/TEESimulator-RS/main/module/changelog.md"
 }
 """
-            )
+            updateJsonFile.writeText(manifest("TEESimulator-RS-$fullVer-Release-Enhanced.zip"))
+            noenhUpdateJsonFile.writeText(manifest("TEESimulator-RS-$fullVer-Release-NoEnhanced.zip"))
         }
     }
 
@@ -156,14 +159,14 @@ androidComponents {
 
         // --- Module zip variants ---------------------------------------------
         // Every build produces two zips per build type, labelled by whether
-        // the enhanced backend is bundled: "-Enh" (with module/taenh) and
-        // "-NoEnh" (same module without it). Local builds, CI artifacts and
-        // releases all carry both variants.
+        // the enhanced backend is bundled: "-Enhanced" (with module/taenh) and
+        // "-NoEnhanced" (same module without it). Local builds, CI artifacts
+        // and releases all carry both variants.
         val sourceModuleDir = rootProject.projectDir.resolve("module")
 
         fun registerModuleZip(withEnhanced: Boolean): TaskProvider<Zip> {
-            val taskSuffix = if (withEnhanced) "" else "NoEnh"
-            val fileSuffix = if (withEnhanced) "-Enh" else "-NoEnh"
+            val taskSuffix = if (withEnhanced) "" else "NoEnhanced"
+            val fileSuffix = if (withEnhanced) "-Enhanced" else "-NoEnhanced"
             val tempModuleDir =
                 project.layout.buildDirectory.dir("module/${variant.name}$fileSuffix")
             val fileName =
@@ -221,16 +224,21 @@ androidComponents {
                     from(sourceModuleDir) {
                         exclude("module.prop") // Exclude the template file.
                         exclude("diag.sh") // Debug-only diagnostic plane; included for debug below.
-                        if (!withEnhanced) exclude("taenh/**") // NoEnh build: no bundled enhanced backend.
+                        if (!withEnhanced) exclude("taenh/**") // NoEnhanced: no bundled enhanced backend.
                     }
 
-                    // Copy and filter the module.prop template separately.
+                    // Copy and filter the module.prop template separately. The
+                    // updateJson manifest depends on whether this build bundles
+                    // the enhanced backend, so it is expanded per variant.
                     from(sourceModuleDir) {
                         include("module.prop")
                         // Use expand() for simple key-value replacement.
                         expand(
                             "REPLACEMEVERCODE" to gitCommitCount.toString(),
                             "REPLACEMEVER" to "$verName-$gitCommitCount",
+                            "REPLACEMEUPDATEJSON" to
+                                "https://raw.githubusercontent.com/MashiroSann/TEESimulator-RS/main/module/" +
+                                    (if (withEnhanced) "update.json" else "update-noenh.json"),
                         )
                     }
 
@@ -258,7 +266,7 @@ androidComponents {
                         doLast {
                             // Marker consumed by customize.sh so a deliberate
                             // backend-less build is not reported as broken.
-                            tempModuleDir.get().asFile.resolve(".noenh").writeText("")
+                            tempModuleDir.get().asFile.resolve(".noenhanced").writeText("")
                         }
                     }
                 }
@@ -276,7 +284,7 @@ androidComponents {
         }
 
         // Full-zip file name: reused by the install/push tasks below.
-        val zipFileName = "TEESimulator-RS-$verName-$gitCommitCount-$capitalized-Enh.zip"
+        val zipFileName = "TEESimulator-RS-$verName-$gitCommitCount-$capitalized-Enhanced.zip"
 
         val zipTask = registerModuleZip(withEnhanced = true)
         registerModuleZip(withEnhanced = false)

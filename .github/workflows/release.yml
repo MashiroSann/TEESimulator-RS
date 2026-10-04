@@ -68,7 +68,7 @@ jobs:
           VER="$VERSION"
           test -n "$VER" || { echo '::error::build workflow did not report a version'; exit 1; }
           # Double-check the tag matches the artifact actually downloaded.
-          ls artifacts/TEESimulator-RS-"$VER"-Release-Enh.zip >/dev/null
+          ls artifacts/TEESimulator-RS-"$VER"-Release-Enhanced.zip >/dev/null
           if gh release view "$VER" >/dev/null 2>&1; then
             echo "::notice::Release $VER already exists - nothing to do."
             echo "exists=yes" >> "$GITHUB_OUTPUT"
@@ -106,10 +106,10 @@ jobs:
             --title "$VER" \
             --latest \
             --notes-file /tmp/notes.md \
-            artifacts/TEESimulator-RS-"$VER"-Release-Enh.zip \
-            artifacts/TEESimulator-RS-"$VER"-Release-NoEnh.zip \
-            artifacts/TEESimulator-RS-"$VER"-Debug-Enh.zip \
-            artifacts/TEESimulator-RS-"$VER"-Debug-NoEnh.zip
+            artifacts/TEESimulator-RS-"$VER"-Release-Enhanced.zip \
+            artifacts/TEESimulator-RS-"$VER"-Release-NoEnhanced.zip \
+            artifacts/TEESimulator-RS-"$VER"-Debug-Enhanced.zip \
+            artifacts/TEESimulator-RS-"$VER"-Debug-NoEnhanced.zip
 
       - name: Commit update.json and released markers
         if: steps.ver.outputs.exists == 'no'
@@ -119,14 +119,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # upload-artifact strips the leading "module/" path component, so the
-          # artifact may land as artifacts/update.json (not artifacts/module/update.json).
+          # artifact may land as artifacts/*.json (not artifacts/module/*.json).
+          # Both update manifests are committed: the Enhanced package tracks
+          # update.json, the NoEnhanced package tracks update-noenh.json.
           if [ -f artifacts/module/update.json ]; then
-            cp artifacts/module/update.json module/update.json
-          elif [ -f artifacts/update.json ]; then
-            cp artifacts/update.json module/update.json
+            JSON_SRC=artifacts/module
           else
-            echo '::error::module/update.json artifact missing'; exit 1
+            JSON_SRC=artifacts
           fi
+          for f in update.json update-noenh.json; do
+            if [ -f "$JSON_SRC/$f" ]; then
+              cp "$JSON_SRC/$f" "module/$f"
+            else
+              echo "::error::module/$f artifact missing"; exit 1
+            fi
+          done
           jq --arg t "$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)" \
              --arg a "$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)" \
              '.teesimulator.lastReleasedSha = $t | .trickyAddon.lastReleasedSha = $a' \
@@ -149,7 +156,7 @@ jobs:
           else
             echo "Changelog already has a section for $VER"
           fi
-          git add module/update.json module/changelog.md .github/upstream-state.json
+          git add module/update.json module/update-noenh.json module/changelog.md .github/upstream-state.json
           if ! git diff --cached --quiet; then
             git commit -m "chore(release): bump update.json to $VER [skip ci]"
             git push origin HEAD:main
