@@ -25,6 +25,7 @@ Beyond upstream, this fork makes the simulator answer like real KeyMint hardware
 - **RSA-OAEP MGF1 follows the spec.** An operation that omits the MGF1 digest defaults to SHA-1 and is rejected with `INCOMPATIBLE_MGF_DIGEST` (`-78`) when the key authorizes a different digest set, and `Digest.NONE` is rejected with `UNSUPPORTED_MGF_DIGEST` (`-79`). For real hardware keys, the key's allowed MGF1 digests are cached when it is generated and the same rules are applied to its operations, so a loose vendor implementation cannot be told apart from a strict one.
 - **Bundled Tricky Addon WebUI.** The module now ships the [Tricky Addon](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) WebUI (upstream `cf16784`, v5.0-beta.4, Apache-2.0). Root managers that support module WebUIs (KernelSU, KernelSU Next, APatch) show it as a second button next to the Action button, served from `webroot/`: edit the target list, manage `keybox.xml` (AOSP / local file / community repo), and review security patch settings. The Action button keeps the original persistent-key management. The WebUI detects this fork and uses its `target.txt` + `security_patch.txt` layout, preserving per-package `[pkg]` patch sections on save.
 - **App attest keys are keybox-rooted.** A key whose sole purpose is `PURPOSE_ATTEST_KEY` is issued by the keybox even without a challenge, like real hardware. Apps that attest their own keys with an app-generated attestation key still chain to the Google root instead of a self-signed "unknown" root.
+- **Embedded automation backend.** The zip now embeds the [Tricky Addon Enhanced](https://github.com/Enginex0/tricky-addon-enhanced) backend (GPL-3.0, pinned `v5.53.1`, cross-compiled from source for arm64-v8a at packaging time; see `.github/ta-enhanced.json`). After install it runs as a daemon beside the engine and automates keybox rotation (Yurikey / KOW / custom), security-patch dates, VBHash spoofing, inotify-based target-list management and conflict reporting, and it can live-update this module's description in the root manager. Everything is controlled from the bundled WebUI (⋮ menu → **Enhanced**). It only reports conflicting modules; it never removes them by itself.
 
 ## What it does
 
@@ -156,14 +157,16 @@ powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -SkipWebui   # reuse
 
 ## Automated upstream sync and releases
 
-This fork tracks two upstreams with GitHub Actions:
+This fork tracks two upstreams plus a pinned backend with GitHub Actions:
 
 - [Enginex0/TEESimulator-RS](https://github.com/Enginex0/TEESimulator-RS) — the core simulator this fork is based on.
 - [KOWX712/Tricky-Addon-Update-Target-List](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) — the bundled `webui/` sources and support files.
+- [Enginex0/tricky-addon-enhanced](https://github.com/Enginex0/tricky-addon-enhanced) — the embedded automation backend, pinned in `.github/ta-enhanced.json`. The source is fetched at the pinned commit and cross-compiled while packaging; the daily check notifies when upstream tags a newer release so the pin can be bumped.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `Build` | push to `main` (module paths), pull requests, manual | Compile check only — builds the WebUI and the module zips, never publishes |
+| `Build` | push to `main` (module paths), pull requests, manual | Compile check only — builds the WebUI, the embedded backend and the module zips, never publishes |
+| `Check Upstream Updates` | daily schedule + manual | Opens/updates an `upstream-sync` issue when an upstream gains commits or a newer backend release appears; closes it once everything is in sync |
 | `Sync Upstreams` | **manual** | Merges both upstreams into a rebuilt `debug` branch, builds it, opens/updates a PR to `main`, and publishes a pre-release (`v6.0.1-<n>-pre` with Release + Debug zips) |
 | `Release` | **manual** (from `main`) | Builds `main`, publishes the latest stable release, and commits the regenerated `module/update.json` back with `[skip ci]` |
 
@@ -205,6 +208,7 @@ Release notes use two sections — `### TEESimulator-RS 更新` and `### Tricky 
 
 - [JingMatrix](https://github.com/JingMatrix/TEESimulator) for the original TEESimulator and its interception design
 - [KOWX712](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) for the Tricky Addon WebUI bundled with this fork (Apache-2.0)
+- [Enginex0](https://github.com/Enginex0/tricky-addon-enhanced) for the Tricky Addon Enhanced backend embedded in this fork (GPL-3.0)
 - [ring](https://github.com/briansmith/ring) for the Rust cryptography
 - [fatalcoder524](https://github.com/fatalcoder524) for contributions and collaboration
 - [huguangares](https://github.com/huguangares) for collaboration and testing

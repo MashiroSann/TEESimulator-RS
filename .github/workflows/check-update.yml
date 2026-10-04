@@ -30,15 +30,19 @@ jobs:
         run: |
           TEES_REPO=Enginex0/TEESimulator-RS
           TA_REPO=KOWX712/Tricky-Addon-Update-Target-List
+          TAE_REPO=Enginex0/tricky-addon-enhanced
 
           TEES_SYNCED=$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)
           TA_SYNCED=$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)
+          TAE_PINNED=$(jq -r '.tag' .github/ta-enhanced.json)
 
           TEES_HEAD=$(gh api "repos/$TEES_REPO/commits/HEAD" --jq '.sha')
           TA_HEAD=$(gh api "repos/$TA_REPO/commits/HEAD" --jq '.sha')
+          TAE_LATEST=$(gh api "repos/$TAE_REPO/releases/latest" --jq '.tag_name' 2>/dev/null || echo "")
 
           echo "TEES: synced=${TEES_SYNCED:0:7} head=${TEES_HEAD:0:7}"
           echo "TA:   synced=${TA_SYNCED:0:7} head=${TA_HEAD:0:7}"
+          echo "TAE:  pinned=$TAE_PINNED latest=${TAE_LATEST:-unknown}"
 
           # A failed compare (e.g. upstream rewrote history and the recorded SHA
           # no longer exists) must NOT look like "no updates" -- fall back to
@@ -48,17 +52,29 @@ jobs:
           TEES_COUNT="${TEES_COUNT:-unknown}"
           TA_COUNT="${TA_COUNT:-unknown}"
 
+          # The enhanced backend is pinned by release tag; a newer upstream
+          # release means the pin should be bumped (rebuild + release).
+          if [ -n "$TAE_LATEST" ] && [ "$TAE_LATEST" != "$TAE_PINNED" ]; then
+            TAE_UPDATE=true
+          else
+            TAE_UPDATE=false
+          fi
+
           echo "TEES new commits: $TEES_COUNT"
           echo "TA new commits:   $TA_COUNT"
+          echo "TA-enhanced update available: $TAE_UPDATE"
 
           {
             echo "tees_count=$TEES_COUNT"
             echo "ta_count=$TA_COUNT"
             echo "tees_head=$TEES_HEAD"
             echo "ta_head=$TA_HEAD"
+            echo "tae_pinned=$TAE_PINNED"
+            echo "tae_latest=$TAE_LATEST"
+            echo "tae_update=$TAE_UPDATE"
           } >> "$GITHUB_OUTPUT"
 
-          if [ "$TEES_COUNT" = "0" ] && [ "$TA_COUNT" = "0" ]; then
+          if [ "$TEES_COUNT" = "0" ] && [ "$TA_COUNT" = "0" ] && [ "$TAE_UPDATE" = "false" ]; then
             echo "::notice::No upstream updates."
             echo "has_updates=false" >> "$GITHUB_OUTPUT"
           else
@@ -73,6 +89,9 @@ jobs:
           TA_COUNT: ${{ steps.check.outputs.ta_count }}
           TEES_HEAD: ${{ steps.check.outputs.tees_head }}
           TA_HEAD: ${{ steps.check.outputs.ta_head }}
+          TAE_PINNED: ${{ steps.check.outputs.tae_pinned }}
+          TAE_LATEST: ${{ steps.check.outputs.tae_latest }}
+          TAE_UPDATE: ${{ steps.check.outputs.tae_update }}
         run: |
           TITLE='Upstream updates available'
           BODY=$(cat <<EOF
@@ -82,6 +101,9 @@ jobs:
           |---|---|---|
           | TEESimulator-RS | $TEES_COUNT | [$TEES_HEAD](https://github.com/Enginex0/TEESimulator-RS/commit/${TEES_HEAD:0:7}) |
           | Tricky Addon | $TA_COUNT | [$TA_HEAD](https://github.com/KOWX712/Tricky-Addon-Update-Target-List/commit/${TA_HEAD:0:7}) |
+          | Tricky Addon Enhanced (bundled backend pin) | $([ "$TAE_UPDATE" = "true" ] && echo "$TAE_PINNED → $TAE_LATEST" || echo "$TAE_PINNED (up to date)") | $([ "$TAE_UPDATE" = "true" ] && echo "[release](https://github.com/Enginex0/tricky-addon-enhanced/releases/latest)" || echo "-") |
+
+          $([ "$TAE_UPDATE" = "true" ] && echo "The embedded enhanced backend is pinned at \`$TAE_PINNED\` but upstream released \`$TAE_LATEST\`. Bump \`.github/ta-enhanced.json\` to ship the new backend.")
 
           <details><summary>Latest TEESimulator commits</summary>
 
@@ -138,4 +160,6 @@ jobs:
             echo "|---|---|"
             echo "| TEESimulator-RS | ${{ steps.check.outputs.tees_count }} |"
             echo "| Tricky Addon | ${{ steps.check.outputs.ta_count }} |"
+            echo ""
+            echo "Bundled backend pin: \`${{ steps.check.outputs.tae_pinned }}\` → latest \`${{ steps.check.outputs.tae_latest }}\` (update: ${{ steps.check.outputs.tae_update }})"
           } >> "$GITHUB_STEP_SUMMARY"

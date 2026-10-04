@@ -3,9 +3,24 @@ MODDIR=${0%/*}
 CONFIG_DIR=/data/adb/tricky_store
 
 # Kill daemon and supervisor
-for pid in $(pidof TEESimulator) $(pidof supervisor) $(pidof daemon); do
+for pid in $(pidof TEESimulator) $(pidof supervisor) $(pidof daemon) $(pidof ta-enhanced); do
     kill -9 "$pid" 2>/dev/null
 done
+
+# Stop the embedded Tricky Addon Enhanced backend gracefully and clean its
+# engine-side state. keybox.xml / target.txt are user data and are preserved.
+TA_STATE="$CONFIG_DIR/ta-enhanced"
+if [ -f "$TA_STATE/daemon.pid" ]; then
+    _ta_pid=$(cat "$TA_STATE/daemon.pid" 2>/dev/null)
+    [ -n "$_ta_pid" ] && kill "$_ta_pid" 2>/dev/null
+fi
+if [ -x "$MODDIR/taenh/arm64-v8a/ta-enhanced" ]; then
+    "$MODDIR/taenh/arm64-v8a/ta-enhanced" daemon-stop >/dev/null 2>&1 || true
+fi
+rm -rf "$TA_STATE"
+rm -rf "$CONFIG_DIR/.automation"
+rm -f "$CONFIG_DIR/.health_state" "$CONFIG_DIR/system_app" "$CONFIG_DIR/target_from_denylist"
+rm -f /data/adb/boot_hash
 
 rm -rf "$CONFIG_DIR/persistent_keys"
 rm -f "$CONFIG_DIR/tee_status.txt"

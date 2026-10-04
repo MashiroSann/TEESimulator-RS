@@ -1,0 +1,14 @@
+{
+  "repo": "Enginex0/tricky-addon-enhanced",
+  "tag": "v5.53.1",
+  "commit": "5c5e49751dd844ea446c7250f09082dc61489f81",
+  "abi": "arm64-v8a",
+  "cargo_target": "aarch64-linux-android",
+  "rawFiles": {
+    "bin/arm64-v8a/resetprop-rs": "d6e766e087e3273839c80bad220038025083631d4159ccea0c488e3078b673fc",
+    "prop.sh": "0746f81cb5e641ad4a5b15ac0dfd45b3156b8c85452ba289a7d1ddd0bd57d1d9",
+    "install_func.sh": "6fb056d82a7f8534d5d76fa303209354e15ed7a31c5227967ed15be8cb7ccf01",
+    "more-exclude.json": "8764863364abf5d0147acdeaa71b8861706acdf6d79ed1848d1402715b609b82",
+    "LICENSE": "22f65f0ba65b3fb08b8f2b681d5cefa436690fe67747fa9ad4674c75695643a4"
+  }
+}

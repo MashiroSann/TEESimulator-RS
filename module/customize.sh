@@ -143,3 +143,123 @@ if [ ! -f "$CONFIG_DIR/hbk" ]; then
   ui_print "- Generating device-unique hardware-bound key seed"
   head -c 32 /dev/random > "$CONFIG_DIR/hbk"
 fi
+
+# --- Embedded Tricky Addon Enhanced backend (arm64-v8a only) -----------------
+# Built from pinned sources at packaging time; see .github/ta-enhanced.json.
+# The backend attaches to this module's config dir (/data/adb/tricky_store)
+# and is controlled from the WebUI's Enhanced panel.
+TAENH_DIR="$MODPATH/taenh"
+TAENH_BIN="$TAENH_DIR/arm64-v8a/ta-enhanced"
+if [ "$ARCH" != "arm64" ]; then
+  ui_print "- Enhanced backend skipped (arm64-v8a only)"
+elif ! unzip -l "$ZIPFILE" | grep -q "taenh/arm64-v8a/ta-enhanced"; then
+  ui_print "! Enhanced backend missing from zip (built without backend?)"
+else
+  ui_print ""
+  ui_print "- Installing Tricky Addon Enhanced backend"
+  unzip -qqo "$ZIPFILE" "taenh/*" -d "$MODPATH" 2>/dev/null
+  chmod -R 755 "$TAENH_DIR"
+
+  if ! "$TAENH_BIN" version >/dev/null 2>&1; then
+    ui_print "! Enhanced backend failed to run; skipping its setup"
+    rm -rf "$TAENH_DIR"
+  else
+    TA_STATE="$CONFIG_DIR/ta-enhanced"
+    mkdir -p "$TA_STATE/logs" "$TA_STATE/bin"
+
+    # VBHash: capture the bootloader digest before any module can tamper with it.
+    _vbhash=$(getprop ro.boot.vbmeta.digest 2>/dev/null \
+      | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]' | grep -oE '^[a-f0-9]{64}$')
+    if [ -n "$_vbhash" ]; then
+      _old_hash=""
+      [ -f "/data/adb/boot_hash" ] && _old_hash=$(cat /data/adb/boot_hash 2>/dev/null)
+      if [ "$_vbhash" != "$_old_hash" ]; then
+        echo "$_vbhash" > /data/adb/boot_hash.tmp && mv -f /data/adb/boot_hash.tmp /data/adb/boot_hash
+        chmod 644 /data/adb/boot_hash
+        ui_print "- VBHash captured from bootloader"
+      fi
+    fi
+
+    # Automation decision: an existing target list is preserved as-is and
+    # automatic target management is left off.
+    if [ -f "$CONFIG_DIR/target.txt" ] && [ -s "$CONFIG_DIR/target.txt" ]; then
+      ui_print "- Detected existing target list; automatic target management is OFF"
+      ui_print "  (检测到 target list，自动管理已关闭)"
+      _automation=0
+    else
+      ui_print "- No target list found; enabling automatic target management"
+      _automation=1
+    fi
+
+    if [ ! -f "$TA_STATE/config.toml" ]; then
+      "$TAENH_BIN" config init --automation="$_automation" 2>/dev/null \
+        || ui_print "! config init failed; daemon will create defaults at first run"
+      # Instant crash-restarts stay with the engine supervisor; the enhanced
+      # health monitor can be enabled from the WebUI Enhanced panel.
+      "$TAENH_BIN" config set health.enabled false 2>/dev/null || true
+    else
+      "$TAENH_BIN" config set automation.enabled "$_automation" 2>/dev/null || true
+    fi
+
+    # Region snapshot (only when unset; never overwrite user overrides).
+    if [ -z "$("$TAENH_BIN" config get region.hwc 2>/dev/null)" ]; then
+      for pair in \
+        "region.hwc:ro.boot.hwc" \
+        "region.hwcountry:ro.boot.hwcountry" \
+        "region.mod_device:ro.product.mod_device" \
+        "region.hardware_sku:ro.boot.product.hardware.sku"; do
+        _k=${pair%%:*}; _p=${pair#*:}
+        _v=$(getprop "$_p" 2>/dev/null)
+        [ -n "$_v" ] && "$TAENH_BIN" config set "$_k" "$_v" 2>/dev/null
+      done
+    fi
+
+    # resetprop-rs is published where the daemon expects it.
+    cp -f "$TAENH_DIR/arm64-v8a/resetprop-rs" "$TA_STATE/bin/resetprop-rs" 2>/dev/null || true
+    chmod 755 "$TA_STATE/bin/resetprop-rs" 2>/dev/null || true
+
+    # Initial target generation (reuses the upstream installer helpers).
+    if [ "$_automation" = "1" ] && [ -f "$TAENH_DIR/install_func.sh" ]; then
+      cp -f "$TAENH_DIR/more-exclude.json" "$MODPATH/more-exclude.json" 2>/dev/null || true
+      # shellcheck disable=SC1090
+      . "$TAENH_DIR/install_func.sh"
+      build_exclude_list 2>/dev/null || true
+      generate_initial_target 2>/dev/null || true
+      rm -f "$MODPATH/more-exclude.json"
+    fi
+
+    ui_print "- Refreshing security patch dates"
+    "$TAENH_BIN" security-patch update --force 2>/dev/null \
+      || ui_print "! Security patch update failed (daemon retries at boot)"
+
+    if [ ! -f "$CONFIG_DIR/keybox.xml" ]; then
+      if timeout 3 ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; then
+        ui_print "- Fetching keybox"
+        _kb_ok=0
+        for _attempt in 1 2 3; do
+          if timeout 5 "$TAENH_BIN" keybox fetch 2>/dev/null; then _kb_ok=1; break; fi
+          sleep 1
+        done
+        [ "$_kb_ok" = "1" ] || ui_print "! Keybox fetch failed (daemon retries at boot)"
+      fi
+    fi
+
+    # Conflict scan (report only; this fork never removes other modules).
+    _conflicts=""
+    for _mod in Yamabukiko TA_utl .TA_utl Yurikey xiaocaiye safetynet-fix \
+      vbmeta-fixer playintegrity integrity_box SukiSU_module Reset_BootHash \
+      Tricky_store-bm Hide_Bootloader ShamikoManager extreme_hide_root \
+      Tricky_Store-xiaoyi tricky_store_assistant extreme_hide_bootloader \
+      wjw_hiderootauxiliarymod PlayIntegrityFork; do
+      [ -d "/data/adb/modules/$_mod" ] && _conflicts="$_conflicts $_mod"
+    done
+    if [ -n "$_conflicts" ]; then
+      ui_print "! Conflicting modules detected (NOT removed):$_conflicts"
+      ui_print "  Remove them manually, or enable auto-remove in the WebUI Enhanced panel."
+    else
+      ui_print "- No conflicting modules detected"
+    fi
+
+    ui_print "- Enhanced backend installed (target management: $([ "$_automation" = 1 ] && echo ON || echo OFF))"
+  fi
+fi

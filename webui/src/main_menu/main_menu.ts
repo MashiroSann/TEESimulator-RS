@@ -62,6 +62,9 @@ export class MainMenu {
         <md-menu-item id="default-policy">
           <div slot="headline">${i18n.t('menu_set_default_policy')}</div>
         </md-menu-item>
+        <md-menu-item id="enhanced-control">
+          <div slot="headline">${i18n.t('menu_enhanced')}</div>
+        </md-menu-item>
         <md-divider role="separator" tabindex="-1"></md-divider>
         <md-menu-item id="help">
           <div slot="headline">${i18n.t('menu_help')}</div>
@@ -103,6 +106,7 @@ export class MainMenu {
       ['keybox-custom', 'menu-keybox-custom'],
       ['prop-setting', 'menu-prop-setting'],
       ['default-policy', 'menu-default-policy'],
+      ['enhanced-control', 'menu-enhanced-control'],
       ['help', 'menu-help'],
       ['about', 'menu-about'],
     ]

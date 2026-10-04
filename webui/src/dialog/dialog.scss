@@ -300,3 +300,80 @@
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+#enhanced-dialog {
+  .enhanced-content {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .enhanced-unavailable {
+    padding: 16px 4px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .enhanced-section {
+    margin-bottom: 20px;
+
+    h4 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+  }
+
+  .enhanced-label {
+    margin: 12px 0 6px;
+    font-size: 0.85rem;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .enhanced-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0;
+  }
+
+  .enhanced-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.85rem;
+
+    .enhanced-row-key {
+      color: var(--md-sys-color-on-surface-variant);
+      flex-shrink: 0;
+    }
+
+    .enhanced-row-value {
+      text-align: right;
+      word-break: break-all;
+      user-select: text;
+    }
+  }
+
+  .enhanced-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    .enh-chip {
+      --md-text-button-container-height: 30px;
+    }
+  }
+
+  .enhanced-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  md-outlined-select,
+  md-outlined-text-field {
+    width: 100%;
+    margin: 6px 0;
+  }
+}

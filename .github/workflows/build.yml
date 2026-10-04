@@ -12,11 +12,13 @@ on:
       - 'native-certgen/**'
       - 'module/**'
       - 'webui/**'
+      - 'scripts/**'
       - 'stub/**'
       - 'gradle/**'
       - '*.gradle.kts'
       - 'gradlew'
       - 'gradlew.bat'
+      - '.github/ta-enhanced.json'
       - '.github/workflows/build.yml'
   pull_request:
     branches: [ "main" ]
@@ -110,6 +112,27 @@ jobs:
             exit 1
           }
           echo "WebUI payload present: $(ls module/webroot | wc -l) entries"
+
+      - name: Ensure Android NDK 27.3
+        run: |
+          NDK="$ANDROID_HOME/ndk/27.3.13750724"
+          if [ ! -d "$NDK" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.3.13750724" > /dev/null
+          fi
+          test -f "$NDK/source.properties" || { echo '::error::NDK 27.3 unavailable'; exit 1; }
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+
+      - name: Cache TA-enhanced backend
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache
+            module/taenh
+          key: tae-${{ runner.os }}-${{ hashFiles('.github/ta-enhanced.json', 'scripts/build-ta-enhanced.py') }}
+          restore-keys: tae-${{ runner.os }}-
+
+      - name: Build embedded Tricky Addon Enhanced backend
+        run: python3 scripts/build-ta-enhanced.py
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4

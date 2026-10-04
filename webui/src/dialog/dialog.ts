@@ -4,6 +4,7 @@ import { Config } from '../config'
 import { AppList } from '../app_list/app_list'
 import { DefaultPolicyDialog } from './policy'
 import { AboutDialog } from './about'
+import { EnhancedDialog } from './enhanced'
 import { HelpDialog } from './help'
 import { UninstallDialog } from './uninstall'
 import { SystemAppDialog } from './system_app'
@@ -18,6 +19,7 @@ export class DialogController {
   readonly defaultPolicy: DefaultPolicyDialog
   readonly systemApp: SystemAppDialog
   readonly prop: PropDialog
+  readonly enhanced: EnhancedDialog
   readonly i18nDialog: I18nDialog
 
   constructor(cli: Cli, config: Config, snackbar: Snackbar, appList: AppList) {
@@ -27,6 +29,7 @@ export class DialogController {
     this.defaultPolicy = new DefaultPolicyDialog(config)
     this.systemApp = new SystemAppDialog(appList)
     this.prop = new PropDialog(cli, config, snackbar)
+    this.enhanced = new EnhancedDialog(cli, snackbar)
     this.i18nDialog = new I18nDialog(cli)
   }
 
@@ -37,6 +40,7 @@ export class DialogController {
     container.appendChild(this.defaultPolicy.getElement())
     container.appendChild(this.systemApp.getElement())
     container.appendChild(this.prop.getElement())
+    container.appendChild(this.enhanced.getElement())
     container.appendChild(this.i18nDialog.getElement())
     this.about.initAnimation()
     this.help.initAnimation()
@@ -44,6 +48,7 @@ export class DialogController {
     this.defaultPolicy.initAnimation()
     this.systemApp.initAnimation()
     this.prop.initAnimation()
+    this.enhanced.initAnimation()
     this.i18nDialog.initAnimation()
   }
 
@@ -69,6 +74,10 @@ export class DialogController {
 
   showProp(): void {
     this.prop.show()
+  }
+
+  showEnhanced(): void {
+    void this.enhanced.show()
   }
 
   showI18nDialog(): void {

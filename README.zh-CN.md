@@ -25,6 +25,7 @@
 - **RSA-OAEP MGF1 遵循规范。** 省略 MGF1 digest 的操作默认使用 SHA-1；当密钥授权的 digest 集不含该值时，返回 `INCOMPATIBLE_MGF_DIGEST`（`-78`）；`Digest.NONE` 返回 `UNSUPPORTED_MGF_DIGEST`（`-79`）。对真实硬件密钥，生成时缓存其允许的 MGF1 digest 并在操作中执行同样规则，使宽松的厂商实现与严格的实现不可区分。
 - **内置 Tricky Addon WebUI。** 模块现捆绑 [Tricky Addon](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) 的 WebUI（上游 `cf16784`，v5.0-beta.4，Apache-2.0）。支持模块 WebUI 的 root 管理器（KernelSU、KernelSU Next、APatch）会在 Action 按钮旁显示第二个按钮，从 `webroot/` 提供：编辑目标列表、管理 `keybox.xml`（AOSP / 本地文件 / 社区仓库）、查看安全补丁设置。Action 按钮保留原有的持久化密钥管理。WebUI 能识别本 fork 并使用其 `target.txt` + `security_patch.txt` 布局，保存时保留每应用的 `[pkg]` 补丁段落。
 - **应用认证密钥由 keybox 签发。** 仅含 `PURPOSE_ATTEST_KEY` 的密钥即使没有 challenge 也由 keybox 签发（与真实硬件一致）。应用使用自生成的认证密钥对自身密钥认证时，证书链仍然连接到 Google 根，而不是自签的"未知根"。
+- **内置自动化后端。** 模块 zip 现内置 [Tricky Addon Enhanced](https://github.com/Enginex0/tricky-addon-enhanced) 后端（GPL-3.0，固定 `v5.53.1`，打包时从源码交叉编译 arm64-v8a；见 `.github/ta-enhanced.json`）。安装后它作为守护进程运行在引擎旁边，自动化 keybox 轮换（Yurikey / KOW / 自定义）、安全补丁日期、VBHash 伪装、基于 inotify 的目标列表管理与冲突报告，还能在管理器的模块描述里实时显示状态。全部功能在自带 WebUI 中控制（⋮ 菜单 → **Enhanced**）。它对冲突模块只报告、绝不自动删除。
 
 ## 它做什么
 
@@ -155,14 +156,16 @@ powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -SkipWebui   # 复�
 
 ## 自动上游同步与发版
 
-本 fork 用 GitHub Actions 跟踪两个上游：
+本 fork 用 GitHub Actions 跟踪两个上游，并固定一个内置后端：
 
 - [Enginex0/TEESimulator-RS](https://github.com/Enginex0/TEESimulator-RS) —— 本 fork 基于的核心模拟器。
 - [KOWX712/Tricky-Addon-Update-Target-List](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) —— 捆绑的 `webui/` 源码与支持文件。
+- [Enginex0/tricky-addon-enhanced](https://github.com/Enginex0/tricky-addon-enhanced) —— 内置自动化后端，pin 记录在 `.github/ta-enhanced.json`。打包时按固定 commit 拉取源码并交叉编译；每日检查发现上游发布新版本时会提醒升级 pin。
 
 | 工作流 | 触发方式 | 作用 |
 |---|---|---|
-| `Build` | 推送到 `main`（模块相关路径）、PR、手动 | 仅编译检查——构建 WebUI 与模块 zip，不发布 |
+| `Build` | 推送到 `main`（模块相关路径）、PR、手动 | 仅编译检查——构建 WebUI、内置后端与模块 zip，不发布 |
+| `Check Upstream Updates` | 每日定时 + 手动 | 上游有新提交或后端有新版本时开/更新 `upstream-sync` issue；全部同步后自动关闭 |
 | `Sync Upstreams` | **手动** | 将两个上游合并到重建的 `debug` 分支并构建，开/更新到 `main` 的 PR，发布 pre-release（`v6.0.1-<n>-pre`，含 Release + Debug zip） |
 | `Release` | **手动**（从 `main`） | 构建 `main`，发布 latest 正式版，并把重新生成的 `module/update.json` 以 `[skip ci]` 提交回去 |
 
@@ -204,6 +207,7 @@ powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -SkipWebui   # 复�
 
 - [JingMatrix](https://github.com/JingMatrix/TEESimulator) —— 原版 TEESimulator 与其拦截设计
 - [KOWX712](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) —— 捆绑的 Tricky Addon WebUI（Apache-2.0）
+- [Enginex0](https://github.com/Enginex0/tricky-addon-enhanced) —— 本 fork 内置的 Tricky Addon Enhanced 后端（GPL-3.0）
 - [ring](https://github.com/briansmith/ring) —— Rust 加密库
 - [fatalcoder524](https://github.com/fatalcoder524) —— 贡献与协作
 - [huguangares](https://github.com/huguangares) —— 贡献与测试

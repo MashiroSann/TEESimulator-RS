@@ -37,6 +37,7 @@ param(
     [switch]$Daemon,
     [switch]$SkipFetch,
     [switch]$SkipWebui,
+    [switch]$SkipTaEnhanced,
     [switch]$NoProxy,
     [string]$JdkHome    = 'G:\workenvironment\jdk-21',
     [string]$SdkRoot    = 'G:\workenvironment\android-sdk',
@@ -181,6 +182,31 @@ if (-not $SkipWebui) {
     Say '  [OK] WebUI -> module\webroot' 'Green'
 } else {
     Say '  [跳过] WebUI 构建（-SkipWebui），直接使用现有 module\webroot' 'Yellow'
+}
+
+# ============================ 2.6 内置增强后端 ============================
+# 从固定版本（.github\ta-enhanced.json）的源码构建 Tricky Addon Enhanced
+# 的 arm64 后端，落到 module\taenh 供打包进模块 zip。
+if (-not $SkipTaEnhanced) {
+    Say ''
+    Say '==== 构建内置增强后端（Tricky Addon Enhanced, arm64）====' 'Cyan'
+    if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+        throw '找不到 python，无法构建增强后端；可用 -SkipTaEnhanced 跳过。'
+    }
+    $oldHttp = $env:HTTP_PROXY; $oldHttps = $env:HTTPS_PROXY
+    if (-not $NoProxy) { $env:HTTP_PROXY = $HttpProxy; $env:HTTPS_PROXY = $HttpProxy }
+    try {
+        & python (Join-Path $projectRoot 'scripts\build-ta-enhanced.py')
+        if ($LASTEXITCODE -ne 0) { throw "增强后端构建失败（退出码 $LASTEXITCODE）" }
+    } finally {
+        $env:HTTP_PROXY = $oldHttp; $env:HTTPS_PROXY = $oldHttps
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'module\taenh\arm64-v8a\ta-enhanced'))) {
+        throw '增强后端产物缺失：module\taenh\arm64-v8a\ta-enhanced'
+    }
+    Say '  [OK] 增强后端 -> module\taenh' 'Green'
+} else {
+    Say '  [跳过] 增强后端（-SkipTaEnhanced），zip 将不包含后端' 'Yellow'
 }
 
 # ============================ 3. 编译 ============================

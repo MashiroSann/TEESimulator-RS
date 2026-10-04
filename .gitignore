@@ -13,6 +13,10 @@ app/src/main/jniLibs/
 webui/node_modules/
 module/webroot/
 
+# Embedded Tricky Addon Enhanced backend (fetched + built at build time)
+module/taenh/
+.cache/
+
 # IDE
 .idea/
 *.iml
