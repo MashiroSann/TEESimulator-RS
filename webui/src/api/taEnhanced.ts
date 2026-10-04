@@ -64,9 +64,29 @@ export interface TaEnhancedInit {
 export class TaEnhanced {
   #cli: Cli
   #binaryPromise: Promise<string> | null = null
+  #initCache: TaEnhancedInit | null = null
+  #hashCache: string | null = null
 
   constructor(cli: Cli) {
     this.#cli = cli
+  }
+
+  /** Last successfully fetched webui-init payload, for instant dialog rendering. */
+  get cachedInit(): TaEnhancedInit | null {
+    return this.#initCache
+  }
+
+  /** Last successfully fetched VBHash value, for instant dialog rendering. */
+  get cachedHash(): string | null {
+    return this.#hashCache
+  }
+
+  /** Warm the caches so the enhanced dialog can paint instantly on first open. */
+  async preload(): Promise<void> {
+    try {
+      await this.init()
+      await this.vbhashShow()
+    } catch {}
   }
 
   async #binary(): Promise<string> {
@@ -93,7 +113,9 @@ export class TaEnhanced {
       if (result.errno !== 0) return null
       const raw = result.stdout.trim()
       if (!raw) return null
-      return JSON.parse(raw) as TaEnhancedInit
+      const parsed = JSON.parse(raw) as TaEnhancedInit
+      this.#initCache = parsed
+      return parsed
     } catch {
       return null
     }
@@ -140,7 +162,9 @@ export class TaEnhanced {
       const result = await exec(`'${bin}' vbhash show 2>/dev/null`)
       if (result.errno !== 0) return null
       const value = result.stdout.trim()
-      return value && value !== 'no valid hash stored' ? value : null
+      const hash = value && value !== 'no valid hash stored' ? value : null
+      this.#hashCache = hash
+      return hash
     } catch {
       return null
     }

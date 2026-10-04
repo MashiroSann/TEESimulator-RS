@@ -34,6 +34,9 @@ export class EnhancedDialog {
           <div id="enh-unavailable" class="enhanced-unavailable" hidden>
             ${i18n.t('enhanced_unavailable')}
           </div>
+          <div id="enh-loading" class="enhanced-loading" hidden>
+            ${i18n.t('enhanced_loading')}
+          </div>
           <div id="enh-body" hidden>
             <section class="enhanced-section">
               <h4>${i18n.t('enhanced_section_status')}</h4>
@@ -177,9 +180,21 @@ export class EnhancedDialog {
     if (this.#dialog) applyDialogAnimation(this.#dialog)
   }
 
+  /** Warm the backend CLI caches so the next open paints instantly. */
+  async preload(): Promise<void> {
+    await this.#api.preload()
+  }
+
   async show(): Promise<void> {
     this.#dialog?.show()
-    await this.refresh()
+    const cached = this.#api.cachedInit
+    if (cached) {
+      // Paint the last known state immediately, then refresh in the background.
+      this.#paint(cached, this.#api.cachedHash)
+      void this.refresh()
+    } else {
+      await this.refresh()
+    }
   }
 
   close(): void {
@@ -187,16 +202,27 @@ export class EnhancedDialog {
   }
 
   async refresh(): Promise<void> {
-    const unavailable = this.#dialog?.querySelector<HTMLElement>('#enh-unavailable')
+    const loading = this.#dialog?.querySelector<HTMLElement>('#enh-loading')
     const body = this.#dialog?.querySelector<HTMLElement>('#enh-body')
-    if (!unavailable || !body) return
+    if (!loading || !body) return
 
+    if (body.hidden) loading.hidden = false
     const data = await this.#api.init()
+    const hash = data ? await this.#api.vbhashShow() : null
+    loading.hidden = true
     if (!data) {
-      unavailable.hidden = false
+      const unavailable = this.#dialog?.querySelector<HTMLElement>('#enh-unavailable')
+      if (unavailable) unavailable.hidden = false
       body.hidden = true
       return
     }
+    this.#paint(data, hash)
+  }
+
+  #paint(data: TaEnhancedInit, hash: string | null): void {
+    const unavailable = this.#dialog?.querySelector<HTMLElement>('#enh-unavailable')
+    const body = this.#dialog?.querySelector<HTMLElement>('#enh-body')
+    if (!unavailable || !body) return
     unavailable.hidden = true
     body.hidden = false
 
@@ -227,7 +253,6 @@ export class EnhancedDialog {
 
     // VBHash
     this.#setSwitch('#enh-vb-enabled', data.config.vbhash.enabled)
-    const hash = await this.#api.vbhashShow()
     this.#renderGrid('#enh-vb-status', [
       [i18n.t('enhanced_vb_hash'), hash ?? i18n.t('enhanced_vb_hash_none')],
     ])

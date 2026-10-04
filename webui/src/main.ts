@@ -191,6 +191,10 @@ dialogContent.querySelectorAll<MdDialog>('md-dialog').forEach((dialog, i) => {
   dialog.addEventListener('closed', () => history.consume(id))
 })
 
+// Warm the enhanced backend CLI caches in the background so its dialog opens
+// with data instantly instead of popping in after the first shell round-trip.
+void dialogController.enhanced.preload()
+
 // Uninstall webui: only meaningful when this WebUI is installed as a separate Tricky Addon
 // module next to the host. When bundled with the host module there is nothing to uninstall.
 const uninstallBtn = document.getElementById('uninstall') as MdFilledButton

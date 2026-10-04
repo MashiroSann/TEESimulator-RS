@@ -302,12 +302,17 @@
 }
 
 #enhanced-dialog {
-  .enhanced-content {
-    max-height: 60vh;
-    overflow-y: auto;
-  }
+  // Scrolling is handled by md-dialog's own internal scroller. A nested
+  // overflow container here splits a fling between two scrollers on Android
+  // WebView (the gesture sticks to the inner one), forcing a second swipe to
+  // reach the end.
 
   .enhanced-unavailable {
+    padding: 16px 4px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .enhanced-loading {
     padding: 16px 4px;
     color: var(--md-sys-color-on-surface-variant);
   }
