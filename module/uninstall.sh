@@ -12,7 +12,11 @@ done
 TA_STATE="$CONFIG_DIR/ta-enhanced"
 if [ -f "$TA_STATE/daemon.pid" ]; then
     _ta_pid=$(cat "$TA_STATE/daemon.pid" 2>/dev/null)
-    [ -n "$_ta_pid" ] && kill "$_ta_pid" 2>/dev/null
+    # Only signal the PID when /proc/<pid>/exe still points at our backend;
+    # a stale PID file after a reboot may reference an unrelated process.
+    if [ -n "$_ta_pid" ] && [ "$(readlink "/proc/$_ta_pid/exe" 2>/dev/null)" = "$MODDIR/taenh/arm64-v8a/ta-enhanced" ]; then
+        kill "$_ta_pid" 2>/dev/null
+    fi
 fi
 if [ -x "$MODDIR/taenh/arm64-v8a/ta-enhanced" ]; then
     "$MODDIR/taenh/arm64-v8a/ta-enhanced" daemon-stop >/dev/null 2>&1 || true

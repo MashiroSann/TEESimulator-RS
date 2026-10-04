@@ -82,14 +82,19 @@ if [ "$_ta_ok" = "1" ]; then
 
   # Single-instance guard: service.sh can be re-run (health monitor restarts
   # the engine by re-running this script), so only start when none is alive.
+  # The daemon camouflages its process name, so pidof cannot see it; verify
+  # the recorded PID through /proc/<pid>/exe instead. After a reboot the PID
+  # file is stale and kill -0 can succeed on an unrelated recycled PID, so a
+  # PID that does not point at our binary is dropped.
   _ta_running=0
   TA_PIDF="$TA_STATE/daemon.pid"
   if [ -f "$TA_PIDF" ]; then
     _ta_pid=$(cat "$TA_PIDF" 2>/dev/null)
-    [ -n "$_ta_pid" ] && kill -0 "$_ta_pid" 2>/dev/null && _ta_running=1
-  fi
-  if [ "$_ta_running" = "0" ] && pidof ta-enhanced >/dev/null 2>&1; then
-    _ta_running=1
+    if [ -n "$_ta_pid" ] && [ "$(readlink "/proc/$_ta_pid/exe" 2>/dev/null)" = "$TAENH_BIN" ]; then
+      _ta_running=1
+    else
+      rm -f "$TA_PIDF"
+    fi
   fi
   if [ "$_ta_running" = "0" ]; then
     "$TAENH_BIN" daemon --manager "$MANAGER" &
