@@ -141,7 +141,7 @@ val refreshUpdateJson by
                 """{
   "version": "$fullVer",
   "versionCode": $capturedCount,
-  "zipUrl": "https://github.com/MashiroSann/TEESimulator-RS/releases/download/$fullVer/TEESimulator-RS-$fullVer-Release.zip",
+  "zipUrl": "https://github.com/MashiroSann/TEESimulator-RS/releases/download/$fullVer/TEESimulator-RS-$fullVer-Release-Enh.zip",
   "changelog": "https://raw.githubusercontent.com/MashiroSann/TEESimulator-RS/main/module/changelog.md"
 }
 """
@@ -155,15 +155,15 @@ androidComponents {
         val isDebug = variant.buildType == "debug"
 
         // --- Module zip variants ---------------------------------------------
-        // Every build produces two zips per build type: the full module and a
-        // "lite" one shipping the same module without module/taenh (no bundled
-        // enhanced backend). Local builds, CI artifacts and releases all carry
-        // both variants.
+        // Every build produces two zips per build type, labelled by whether
+        // the enhanced backend is bundled: "-Enh" (with module/taenh) and
+        // "-NoEnh" (same module without it). Local builds, CI artifacts and
+        // releases all carry both variants.
         val sourceModuleDir = rootProject.projectDir.resolve("module")
 
-        fun registerModuleZip(lite: Boolean): TaskProvider<Zip> {
-            val taskSuffix = if (lite) "Lite" else ""
-            val fileSuffix = if (lite) "-lite" else ""
+        fun registerModuleZip(withEnhanced: Boolean): TaskProvider<Zip> {
+            val taskSuffix = if (withEnhanced) "" else "NoEnh"
+            val fileSuffix = if (withEnhanced) "-Enh" else "-NoEnh"
             val tempModuleDir =
                 project.layout.buildDirectory.dir("module/${variant.name}$fileSuffix")
             val fileName =
@@ -221,7 +221,7 @@ androidComponents {
                     from(sourceModuleDir) {
                         exclude("module.prop") // Exclude the template file.
                         exclude("diag.sh") // Debug-only diagnostic plane; included for debug below.
-                        if (lite) exclude("taenh/**") // Lite build: no bundled enhanced backend.
+                        if (!withEnhanced) exclude("taenh/**") // NoEnh build: no bundled enhanced backend.
                     }
 
                     // Copy and filter the module.prop template separately.
@@ -254,11 +254,11 @@ androidComponents {
                         }
                     }
 
-                    if (lite) {
+                    if (!withEnhanced) {
                         doLast {
                             // Marker consumed by customize.sh so a deliberate
                             // backend-less build is not reported as broken.
-                            tempModuleDir.get().asFile.resolve(".lite").writeText("")
+                            tempModuleDir.get().asFile.resolve(".noenh").writeText("")
                         }
                     }
                 }
@@ -276,10 +276,10 @@ androidComponents {
         }
 
         // Full-zip file name: reused by the install/push tasks below.
-        val zipFileName = "TEESimulator-RS-$verName-$gitCommitCount-$capitalized.zip"
+        val zipFileName = "TEESimulator-RS-$verName-$gitCommitCount-$capitalized-Enh.zip"
 
-        val zipTask = registerModuleZip(lite = false)
-        registerModuleZip(lite = true)
+        val zipTask = registerModuleZip(withEnhanced = true)
+        registerModuleZip(withEnhanced = false)
 
         // Task 3: A helper function to create installation tasks for different root providers.
         fun createInstallTasks(rootProvider: String, installCli: String) {

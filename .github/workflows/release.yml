@@ -68,7 +68,7 @@ jobs:
           VER="$VERSION"
           test -n "$VER" || { echo '::error::build workflow did not report a version'; exit 1; }
           # Double-check the tag matches the artifact actually downloaded.
-          ls artifacts/TEESimulator-RS-"$VER"-Release.zip >/dev/null
+          ls artifacts/TEESimulator-RS-"$VER"-Release-Enh.zip >/dev/null
           if gh release view "$VER" >/dev/null 2>&1; then
             echo "::notice::Release $VER already exists - nothing to do."
             echo "exists=yes" >> "$GITHUB_OUTPUT"
@@ -106,10 +106,10 @@ jobs:
             --title "$VER" \
             --latest \
             --notes-file /tmp/notes.md \
-            artifacts/TEESimulator-RS-"$VER"-Release.zip \
-            artifacts/TEESimulator-RS-"$VER"-Release-lite.zip \
-            artifacts/TEESimulator-RS-"$VER"-Debug.zip \
-            artifacts/TEESimulator-RS-"$VER"-Debug-lite.zip
+            artifacts/TEESimulator-RS-"$VER"-Release-Enh.zip \
+            artifacts/TEESimulator-RS-"$VER"-Release-NoEnh.zip \
+            artifacts/TEESimulator-RS-"$VER"-Debug-Enh.zip \
+            artifacts/TEESimulator-RS-"$VER"-Debug-NoEnh.zip
 
       - name: Commit update.json and released markers
         if: steps.ver.outputs.exists == 'no'
