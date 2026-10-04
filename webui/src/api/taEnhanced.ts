@@ -1,6 +1,11 @@
 import { exec } from 'kernelsu-alt'
 import type { Cli } from '../cli'
 
+/** POSIX single-quote a value so it survives the root shell verbatim. */
+function shQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
 /** State returned by `ta-enhanced webui-init` (top-level keys are camelCase). */
 export interface TaEnhancedInit {
   module: {
@@ -124,7 +129,7 @@ export class TaEnhanced {
   async configSet(key: string, value: string): Promise<boolean> {
     const bin = await this.#binary()
     try {
-      const result = await exec(`'${bin}' config set '${key}' '${value}' 2>&1`)
+      const result = await exec(`'${bin}' config set ${shQuote(key)} ${shQuote(value)} 2>&1`)
       return result.errno === 0
     } catch {
       return false

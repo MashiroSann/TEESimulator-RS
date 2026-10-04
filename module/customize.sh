@@ -116,6 +116,12 @@ if [ ! -d "$CONFIG_DIR" ]; then
   mkdir -p "$CONFIG_DIR"
 fi
 
+# Snapshot the pre-install state. The default files extracted below would
+# otherwise mask it: the shipped target.txt has entries, and an AOSP
+# keybox.xml is always installed when missing.
+_TA_HAD_KEYBOX=0; [ -f "$CONFIG_DIR/keybox.xml" ] && _TA_HAD_KEYBOX=1
+_TA_HAD_TARGET=0; [ -s "$CONFIG_DIR/target.txt" ] && _TA_HAD_TARGET=1
+
 if [ ! -f "$CONFIG_DIR/keybox.xml" ]; then
   ui_print "- Adding AOSP software keybox"
   install_file "keybox.xml" "$CONFIG_DIR"
@@ -180,25 +186,30 @@ else
       fi
     fi
 
-    # Automation decision: an existing target list is preserved as-is and
-    # automatic target management is left off.
-    if [ -f "$CONFIG_DIR/target.txt" ] && [ -s "$CONFIG_DIR/target.txt" ]; then
-      ui_print "- Detected existing target list; automatic target management is OFF"
-      ui_print "  (检测到 target list，自动管理已关闭)"
-      _automation=0
-    else
-      ui_print "- No target list found; enabling automatic target management"
-      _automation=1
-    fi
-
+    # Automation decision. Only a first-time setup derives it from the target
+    # list (an existing list is preserved and automatic management left off);
+    # reinstalls keep whatever the user configured in the WebUI panel.
     if [ ! -f "$TA_STATE/config.toml" ]; then
+      if [ "$_TA_HAD_TARGET" = "1" ]; then
+        ui_print "- Detected existing target list; automatic target management is OFF"
+        ui_print "  (检测到 target list，自动管理已关闭)"
+        _automation=0
+      else
+        ui_print "- No target list found; enabling automatic target management"
+        _automation=1
+      fi
       "$TAENH_BIN" config init --automation="$_automation" 2>/dev/null \
         || ui_print "! config init failed; daemon will create defaults at first run"
       # Instant crash-restarts stay with the engine supervisor; the enhanced
       # health monitor can be enabled from the WebUI Enhanced panel.
       "$TAENH_BIN" config set health.enabled false 2>/dev/null || true
     else
-      "$TAENH_BIN" config set automation.enabled "$_automation" 2>/dev/null || true
+      _automation=$("$TAENH_BIN" config get automation.enabled 2>/dev/null)
+      case "$_automation" in
+        true|1) _automation=1 ;;
+        *)      _automation=0 ;;
+      esac
+      ui_print "- Existing enhanced config kept (target management: $([ "$_automation" = 1 ] && echo ON || echo OFF))"
     fi
 
     # Region snapshot (only when unset; never overwrite user overrides).
@@ -218,8 +229,10 @@ else
     cp -f "$TAENH_DIR/arm64-v8a/resetprop-rs" "$TA_STATE/bin/resetprop-rs" 2>/dev/null || true
     chmod 755 "$TA_STATE/bin/resetprop-rs" 2>/dev/null || true
 
-    # Initial target generation (reuses the upstream installer helpers).
-    if [ "$_automation" = "1" ] && [ -f "$TAENH_DIR/install_func.sh" ]; then
+    # Initial target generation (reuses the upstream installer helpers). Only
+    # for a fresh setup where automation was just switched on -- regenerating
+    # on reinstall would overwrite a curated list.
+    if [ "$_TA_HAD_TARGET" = "0" ] && [ "$_automation" = "1" ] && [ -f "$TAENH_DIR/install_func.sh" ]; then
       cp -f "$TAENH_DIR/more-exclude.json" "$MODPATH/more-exclude.json" 2>/dev/null || true
       # shellcheck disable=SC1090
       . "$TAENH_DIR/install_func.sh"
@@ -233,7 +246,10 @@ else
     # custom_date) from the daemon at boot. A forced bulletin refresh here
     # used to clobber the user's chosen date on every reinstall.
 
-    if [ ! -f "$CONFIG_DIR/keybox.xml" ]; then
+    # First install only: try to fetch a real keybox to replace the AOSP
+    # default that was extracted above. (Checking the file directly would
+    # never fire, the default is always present by this point.)
+    if [ "$_TA_HAD_KEYBOX" = "0" ]; then
       if timeout 3 ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; then
         ui_print "- Fetching keybox"
         _kb_ok=0

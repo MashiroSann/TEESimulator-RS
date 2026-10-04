@@ -129,7 +129,10 @@ export class EnhancedDialog {
       chip.textContent = label
       chip.classList.add('enh-chip')
       chip.dataset.seconds = String(seconds)
-      chip.onclick = () => this.#saveConfig('keybox.interval', String(seconds))
+      chip.onclick = async () => {
+        await this.#saveConfig('keybox.interval', String(seconds))
+        await this.refresh()
+      }
       chipRow.appendChild(chip)
     }
 

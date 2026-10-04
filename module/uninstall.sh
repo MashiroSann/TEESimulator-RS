@@ -2,9 +2,13 @@
 MODDIR=${0%/*}
 CONFIG_DIR=/data/adb/tricky_store
 
-# Kill daemon and supervisor
-for pid in $(pidof TEESimulator) $(pidof supervisor) $(pidof daemon) $(pidof ta-enhanced); do
+# Kill daemon and supervisor. "daemon" is a generic process name, so only
+# PIDs whose /proc/<pid>/exe points at this module's binary are killed.
+for pid in $(pidof TEESimulator) $(pidof supervisor) $(pidof ta-enhanced); do
     kill -9 "$pid" 2>/dev/null
+done
+for pid in $(pidof daemon); do
+    [ "$(readlink "/proc/$pid/exe" 2>/dev/null)" = "$MODDIR/daemon" ] && kill -9 "$pid" 2>/dev/null
 done
 
 # Stop the embedded Tricky Addon Enhanced backend gracefully and clean its
