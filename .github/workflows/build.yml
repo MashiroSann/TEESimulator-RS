@@ -49,14 +49,14 @@ jobs:
       version: ${{ steps.version.outputs.version }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: "recursive"
           fetch-depth: 0
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
@@ -68,7 +68,7 @@ jobs:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
       - name: Cache Rust artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -82,7 +82,7 @@ jobs:
         run: command -v cargo-ndk || cargo install cargo-ndk
 
       - name: Set up ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@v1.2.24
         with:
           key: ccache-${{ runner.os }}-${{ github.ref_name }}
           restore-keys: |
@@ -96,7 +96,7 @@ jobs:
           version: 'latest'
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 'lts/*'
           cache: 'pnpm'
@@ -126,7 +126,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
 
       - name: Cache TA-enhanced backend
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .cache
@@ -138,7 +138,7 @@ jobs:
         run: python3 scripts/build-ta-enhanced.py
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build with Gradle
         run: |
@@ -160,21 +160,21 @@ jobs:
           echo "Release: $(ls out/*Release*.zip | head -1) ($(du -h out/*Release*.zip | head -1 | cut -f1))"
           echo "Debug: $(ls out/*Debug*.zip | head -1) ($(du -h out/*Debug*.zip | head -1 | cut -f1))"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TEESimulator-RS-release-zip
           path: out/TEESimulator-RS-*-Release.zip
           retention-days: 30
           compression-level: 0
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TEESimulator-RS-debug-zip
           path: out/TEESimulator-RS-*-Debug.zip
           retention-days: 7
           compression-level: 0
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-mappings
           path: app/build/outputs/mapping/release
@@ -183,7 +183,7 @@ jobs:
 
       # Gradle's refreshUpdateJson rewrites module/update.json to match the built
       # version; release.yml commits it back when publishing.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: module-update-json
           path: module/update.json
