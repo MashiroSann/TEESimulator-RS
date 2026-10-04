@@ -126,28 +126,34 @@ def patch_fingerprint() -> str:
     return digest.hexdigest()[:16]
 
 
+def run_git_apply(src_dir: str, args: list) -> subprocess.CompletedProcess:
+    result = subprocess.run(
+        ["git", "apply", "-v", *args],
+        cwd=src_dir,
+        capture_output=True,
+        text=True,
+    )
+    # git-format patches (with an `index` line) are hashed against the object
+    # store of the repository the source dir lives in; when those blobs are
+    # unknown, git silently "skips" the patch but still exits 0, which would
+    # otherwise be misread as "already applied". Treat it as a hard error.
+    if "Skipped patch" in result.stderr:
+        die(f"patch was skipped by git apply: {result.stderr.strip()}")
+    return result
+
+
 def apply_patches(src_dir: str) -> None:
     for path in patch_files():
         name = os.path.basename(path)
-        reverse = subprocess.run(
-            ["git", "apply", "--reverse", "--check", path],
-            cwd=src_dir,
-            capture_output=True,
-            text=True,
-        )
+        reverse = run_git_apply(src_dir, ["--reverse", "--check", path])
         if reverse.returncode == 0:
             continue  # already applied
-        check = subprocess.run(
-            ["git", "apply", "--check", path],
-            cwd=src_dir,
-            capture_output=True,
-            text=True,
-        )
+        check = run_git_apply(src_dir, ["--check", path])
         if check.returncode != 0:
             die(f"{name} does not apply: {check.stderr.strip()}")
-        applied = subprocess.run(["git", "apply", path], cwd=src_dir)
+        applied = run_git_apply(src_dir, [path])
         if applied.returncode != 0:
-            die(f"{name} failed to apply")
+            die(f"{name} failed to apply: {applied.stderr.strip()}")
         log(f"applied {name}")
 
 

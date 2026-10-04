@@ -15,7 +15,7 @@
 # logs a warning and keeps the existing security_patch.txt / devconfig.toml
 # values untouched until the next successful fetch.
 #
-diff --git a/rust/src/security_patch/bulletin.rs b/rust/src/security_patch/bulletin.rs
+#diff --git a/rust/src/security_patch/bulletin.rs b/rust/src/security_patch/bulletin.rs
 index eb24933..7c6b25c 100644
 --- a/rust/src/security_patch/bulletin.rs
 +++ b/rust/src/security_patch/bulletin.rs
