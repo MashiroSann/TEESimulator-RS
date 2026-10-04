@@ -1,0 +1,67 @@
+# Patch: restore the original module description when live status is disabled
+#
+# Upstream: Enginex0/tricky-addon-enhanced @ v5.53.1 (5c5e497)
+# Applies to: rust/src/config/mod.rs, rust/src/daemon/scheduler.rs
+#
+# The live module description is only refreshed by StatusTask while
+# config.status.enabled is true. Turning it off left the last generated
+# live text in module.prop forever, because the disabled task never runs
+# and nothing else restores description.bak.
+#
+# * `config set status.enabled false` now restores the original description
+#   right away (works even when the daemon is not running).
+# * The daemon also restores it when the config transition is picked up at
+#   runtime, and once at startup if the task is already disabled, so a stale
+#   live description can never survive a reboot either.
+#
+#diff --git a/rust/src/config/mod.rs b/rust/src/config/mod.rs
+index 3689a2f..8121c5c 100644
+--- a/rust/src/config/mod.rs
++++ b/rust/src/config/mod.rs
+@@ -518,6 +518,12 @@ pub fn handle_config(
+             cfg.set(&key, &value)?;
+             Config::backup(None)?;
+             cfg.save(None)?;
++            // Turning the live module description off restores the original
++            // one immediately instead of waiting for the daemon to pick the
++            // change up from config.toml (or never, if it is not running).
++            if key == "status.enabled" && !cfg.status.enabled {
++                let _ = crate::status::restore_original_description();
++            }
+             Ok(())
+         }
+         ConfigAction::Migrate => {
+#diff --git a/rust/src/daemon/scheduler.rs b/rust/src/daemon/scheduler.rs
+index fa6f892..64233b9 100644
+--- a/rust/src/daemon/scheduler.rs
++++ b/rust/src/daemon/scheduler.rs
+@@ -18,7 +18,13 @@ struct TaskSlot {
+ }
+ 
+ impl Scheduler {
+-    pub fn new(_config: &Config, epoll_fd: RawFd, manager: Option<String>) -> anyhow::Result<Self> {
++    pub fn new(config: &Config, epoll_fd: RawFd, manager: Option<String>) -> anyhow::Result<Self> {
++        // Starting with the status task disabled must not leave a stale live
++        // description behind from a previous run; restore the original one.
++        if !config.status.enabled {
++            let _ = crate::status::restore_original_description();
++        }
++
+         let task_defs: Vec<(Box<dyn DaemonTask>, u32)> = vec![
+             (Box::new(StatusTask::new()), 5),
+             (Box::new(AutomationTask::new()), 10),
+@@ -71,6 +77,14 @@ impl Scheduler {
+     }
+ 
+     pub fn reconfigure(&mut self, old: &Config, new: &Config) {
++        // The moment the live description feature is switched off, put the
++        // original module description back (the task no longer runs once it
++        // is disabled, so this cannot be handled inside the task itself).
++        if old.status.enabled && !new.status.enabled {
++            tracing::info!("status task disabled, restoring original module description");
++            let _ = crate::status::restore_original_description();
++        }
++
+         for slot in &mut self.slots {
+             if !slot.stagger_done {
+                 continue;
