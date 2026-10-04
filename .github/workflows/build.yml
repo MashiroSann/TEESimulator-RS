@@ -13,11 +13,14 @@ on:
       - 'module/**'
       - 'webui/**'
       - 'scripts/**'
+      - 'patches/**'
       - 'stub/**'
       - 'gradle/**'
       - '*.gradle.kts'
       - 'gradlew'
       - 'gradlew.bat'
+      - 'build-module.ps1'
+      - 'gradle.properties'
       - '.github/ta-enhanced.json'
       - '.github/workflows/build.yml'
   pull_request:
@@ -128,7 +131,7 @@ jobs:
           path: |
             .cache
             module/taenh
-          key: tae-${{ runner.os }}-${{ hashFiles('.github/ta-enhanced.json', 'scripts/build-ta-enhanced.py') }}
+          key: tae-${{ runner.os }}-${{ hashFiles('.github/ta-enhanced.json', 'scripts/build-ta-enhanced.py', 'patches/ta-enhanced/*.patch') }}
           restore-keys: tae-${{ runner.os }}-
 
       - name: Build embedded Tricky Addon Enhanced backend
