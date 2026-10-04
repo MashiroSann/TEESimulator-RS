@@ -3,19 +3,11 @@
 **English** — The module now bundles the Tricky Addon Enhanced automation backend with its own control panel.
 
 - **Enhanced automation backend (optional, arm64).** The release zip embeds the Tricky Addon Enhanced daemon (by Enginex0, GPL-3.0, built from pinned source): keybox rotation, security-patch auto-update, VBHash spoofing, live module description, automatic target-list maintenance and conflict detection — controlled from the new "Enhanced" panel in the WebUI. A `-NoEnhanced` zip is published alongside the regular one; each build tracks its own update channel.
-- **Keybox fetching works with real-world keyboxes again.** The fetch-time validator accepts common community keyboxes (SEC1 private keys and P-256/P-384 ECDSA certificate chains), so "Fetch now" and automatic rotation succeed instead of rejecting valid files.
-- **Security patch control.** The Enhanced panel can toggle the daily Google-bulletin auto-update and pin a custom date; reinstalling the module no longer overwrites your date, and a failed bulletin fetch keeps the current date instead of inventing one.
-- **Daemon reliability.** The enhanced daemon now starts reliably after every reboot (a stale PID file could previously make it skip startup), and turning off the live module description restores the original description immediately.
-- **Panel fixes.** The Enhanced panel opens instantly and scrolls in a single swipe.
 
 **简体中文** — 模块现已内置 Tricky Addon Enhanced 自动化后端，并提供独立控制面板。
 
 - **内置增强自动化后端（可选，arm64）。** Release 包内置 Tricky Addon Enhanced 守护进程（Enginex0 开发，GPL-3.0，按固定版本源码构建）：keybox 轮换、安全补丁自动更新、VBHash 伪装、模块描述实时状态、目标列表自动维护与冲突检测，全部由 WebUI 新增的"Enhanced"面板控制。同时发布不含后端的 `-NoEnhanced` 包，两种包各自更新各自的分支。
-- **keybox 获取恢复正常。** 校验器现在接受常见的真实 keybox（SEC1 私钥与 P-256/P-384 ECDSA 证书链），"立即获取"和自动轮换不再误判有效文件。
-- **安全补丁可控。** Enhanced 面板可开关"跟随 Google 公告自动更新"并固定自定义日期；重装模块不再覆盖你的日期；公告抓取失败时保留现有日期，不再凭空生成。
-- **守护进程可靠性。** 修复重启后 daemon 可能不启动的问题；关闭"实时状态"后立即恢复模块原始描述。
-- **面板体验修复。** Enhanced 面板即时打开，一次滑动即可到底。
-
+- 
 ## TEESimulator-RS v6.0.1-338
 
 **English** — WebUI cleanup: the bundled Tricky Addon WebUI no longer carries its own update machinery.
