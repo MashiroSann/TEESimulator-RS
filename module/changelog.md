@@ -7,7 +7,7 @@
 **简体中文** — 模块现已内置 Tricky Addon Enhanced 自动化后端，并提供独立控制面板。
 
 - **内置增强自动化后端（可选，arm64）。** Release 包内置 Tricky Addon Enhanced 守护进程（Enginex0 开发，GPL-3.0，按固定版本源码构建）：keybox 轮换、安全补丁自动更新、VBHash 伪装、模块描述实时状态、目标列表自动维护与冲突检测，全部由 WebUI 新增的"Enhanced"面板控制。同时发布不含后端的 `-NoEnhanced` 包，两种包各自更新各自的分支。
-- 
+
 ## TEESimulator-RS v6.0.1-338
 
 **English** — WebUI cleanup: the bundled Tricky Addon WebUI no longer carries its own update machinery.
