@@ -1,5 +1,7 @@
-@import url('https://mui.kernelsu.org/internal/insets.css');
-@import url('https://mui.kernelsu.org/internal/colors.css');
+// Manager-provided theme variables (https://mui.kernelsu.org/internal/*.css)
+// are injected asynchronously by src/bootstrap.ts. Keeping them as CSS
+// @imports here made them render-blocking: when the manager cannot serve them
+// and the virtual host is unreachable, the page never finished loading.
 
 :root {
   --top-inset: var(--window-inset-top, 0px);

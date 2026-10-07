@@ -173,13 +173,15 @@ export class AppList {
       const link = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/more-exclude.json`
       let response: Response | null = null
 
+      // Timeout-bounded fetches: without a proxy these hosts can stall on DNS
+      // resolution instead of failing, which would hang the menu action.
       try {
-        response = await fetch(link)
+        response = await fetch(link, { signal: AbortSignal.timeout(8000) })
       } catch {}
 
       if (!response || !response.ok) {
         try {
-          response = await fetch(`https://gh.sevencdn.com/${link}`)
+          response = await fetch(`https://gh.sevencdn.com/${link}`, { signal: AbortSignal.timeout(8000) })
         } catch {}
       }
 
