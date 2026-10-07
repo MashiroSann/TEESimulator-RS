@@ -1,3 +1,13 @@
+## TEESimulator-RS v6.0.1-367
+
+**English** — Fixed the WebUI getting stuck on its loading spinner and the Enhanced panel hanging on "Loading" when the network is unreachable (for example without a proxy).
+
+- **The WebUI no longer touches the network while just opening.** The Enhanced panel's keybox status check fetched Google's attestation revocation list (`android.googleapis.com`); on blocked or unreachable networks that request stalled, and because root managers execute WebUI bridge commands synchronously, one stalled request froze the entire page. Panel validation now uses only the embedded revocation list and opens instantly offline — the online list is still used when actually fetching or installing a keybox. In addition, every bridge call and locale request in the startup path now has a hard timeout with fallback rendering, so a stalled command can never keep the loading spinner on screen again.
+
+**简体中文** — 修复无代理/网络不通时 WebUI 卡在加载转圈、Enhanced 面板卡在"加载中"的问题。
+
+- **WebUI 仅打开页面时不再联网。** Enhanced 面板的 keybox 状态校验会请求 Google 吊销名单（`android.googleapis.com`），网络被墙时该请求长时间挂起；而 root 管理器对 WebUI 桥接命令是同步执行，一条挂起的命令就会冻结整个页面。现在面板校验只使用内置吊销名单，离线也能秒开——在线名单仍用于真正获取/安装 keybox 的流程。此外，启动链路上的所有桥接调用与语言文件请求都加了硬超时和回退渲染，卡住的命令不会再让加载转圈无限持续。
+
 ## TEESimulator-RS v6.0.1-360
 
 **English** — The module now bundles the Tricky Addon Enhanced automation backend with its own control panel.
