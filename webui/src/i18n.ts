@@ -68,14 +68,17 @@ export class I18nManager {
    */
   async init(): Promise<void> {
     try {
-      const baseResponse = await fetch('./locales/strings/en.xml')
+      // Timeout-bounded fetches: these are served by the root manager through
+      // its asset loader, which can hang when the bridge stalls. A stalled
+      // await here froze the whole page on its loading placeholder.
+      const baseResponse = await fetch('./locales/strings/en.xml', { signal: AbortSignal.timeout(5000) })
       const baseXML = await baseResponse.text()
       this.#baseTranslations = this.#parseXml(baseXML)
 
       this.#currentLang = await this.#detectLanguage()
 
       if (this.#currentLang !== 'en') {
-        const response = await fetch(`locales/strings/${this.#currentLang}.xml`)
+        const response = await fetch(`locales/strings/${this.#currentLang}.xml`, { signal: AbortSignal.timeout(5000) })
         const userXML = await response.text()
         this.#translations = { ...this.#baseTranslations, ...this.#parseXml(userXML) }
       } else {
@@ -120,7 +123,7 @@ export class I18nManager {
     const langCode = userLang.split('-')[0]
 
     try {
-      const resp = await fetch('locales/languages.json')
+      const resp = await fetch('locales/languages.json', { signal: AbortSignal.timeout(5000) })
       const data = await resp.json() as Record<string, string>
 
       this.#languages = data

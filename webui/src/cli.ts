@@ -1,4 +1,5 @@
-import { exec, spawn } from 'kernelsu-alt'
+import { spawn } from 'kernelsu-alt'
+import { exec } from './utils/exec'
 import { File } from './file'
 import { MOD_ID, OMK_MOD_ID, TEES_MOD_ID, TS_MOD_ID } from './constant'
 import { isDev } from './utils/dev'
@@ -125,7 +126,7 @@ export class Cli {
 
   async unzip(zipPath: string, dest: string): Promise<void> {
     await File.createDirectory(dest)
-    const result = await exec(`unzip -o '${zipPath}' -d '${dest}'`)
+    const result = await exec(`unzip -o '${zipPath}' -d '${dest}'`, 60000)
     if (result.errno !== 0) {
       throw new Error(`unzip failed (${result.errno}): ${result.stderr}`)
     }
@@ -201,6 +202,7 @@ export class Cli {
       resetprop -n ro.boot.vbmeta.digest "${hash}"
       resetprop -c $(resetprop -Z ro.boot.vbmeta.digest) >/dev/null 2>&1 || true
       resetprop -c >/dev/null 2>&1 || true`,
+      8000,
       { env: { PATH: `$PATH:${managerPath}` } })
     if (result.errno !== 0) throw new Error(`setBootHash failed (${result.errno})`)
   }

@@ -18,10 +18,15 @@ import { SearchBar } from './search_bar/search_bar'
 import { Keybind } from './keybind'
 import { MOD_ID, OMK_MOD_ID, TEES_MOD_ID, TS_MOD_ID } from './constant'
 import { File } from './file'
+import { withTimeout } from './utils/exec'
 import './style.scss'
 import { isDev } from './utils/dev'
 
-await i18n.init()
+// Every startup step is hard-bounded: a stalled bridge callback (exec results
+// come back through a javascript: callback that can be lost) or a hung fetch
+// must never leave the loading spinner on screen forever. On timeout the page
+// falls back to an empty/config-less render which the user can refresh.
+await withTimeout(i18n.init(), 9000)
 
 const snackbar = new Snackbar()
 const fileSelector = new FileSelector()
@@ -31,8 +36,8 @@ const keybind = new Keybind()
 
 let config: Config
 try {
-  const tsInfo = await cli.getTrickyStoreInfo()
-  config = await createConfig(tsInfo)
+  const tsInfo = await withTimeout(cli.getTrickyStoreInfo(), 8000)
+  config = tsInfo ? await createConfig(tsInfo) : new Config()
 } catch {
   config = new Config()
 }
@@ -100,8 +105,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = /* html */ `
 
 // App List
 const appList = new AppList(config, cli)
-await config.read()
-await appList.fetch()
+await withTimeout(config.read(), 8000)
+await withTimeout(appList.fetch(), 12000)
 appList.syncSystemAppsWithConfig()
 const appListContainer = document.querySelector<HTMLElement>('.app-list')!
 appList.renderAppList(appListContainer)

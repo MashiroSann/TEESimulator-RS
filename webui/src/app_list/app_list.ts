@@ -1,6 +1,7 @@
 import { listPackages, getPackagesInfo } from 'kernelsu-alt'
 import type { PackagesInfo } from 'kernelsu-alt'
 import type { MdDialog, MdRadio } from '@material/web/all'
+import { withTimeout } from '../utils/exec'
 import { Cli } from '../cli'
 import { Config } from '../config'
 import { i18n } from '../i18n'
@@ -51,12 +52,16 @@ export class AppList {
       return
     }
 
-    const pkgs = await listPackages('all').catch(() => [])
+    // Timeout-bounded bridge calls: a lost callback would otherwise keep the
+    // startup spinner on screen forever. On timeout the list renders empty
+    // (and is refreshed later) instead of blocking the whole page.
+    const pkgs = (await withTimeout(listPackages('all').catch(() => []), 8000)) ?? []
 
     let infos: PackagesInfo[]
-    try {
-      infos = await getPackagesInfo(pkgs) as PackagesInfo[]
-    } catch {
+    const fetchedInfos = await withTimeout(getPackagesInfo(pkgs), 8000)
+    if (fetchedInfos) {
+      infos = fetchedInfos as PackagesInfo[]
+    } else {
       infos = pkgs.map((pkg: string) => ({
         packageName: pkg,
         versionName: '',
@@ -195,7 +200,7 @@ export class AppList {
         console.warn('Failed to fetch online unnecessary apps list, using local xposed list only')
       }
 
-      const xposedList = await this.#cli.getXposedList()
+      const xposedList = (await withTimeout(this.#cli.getXposedList(), 15000)) ?? []
       const unnecessaryApps = new Set([...excludeList, ...xposedList])
 
       const target = (this.#config.get('target') as string[]) || []

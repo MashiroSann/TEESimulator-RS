@@ -1,4 +1,4 @@
-import { exec } from 'kernelsu-alt'
+import { exec } from './utils/exec'
 
 export class File {
   static async exist(path: string): Promise<boolean> {

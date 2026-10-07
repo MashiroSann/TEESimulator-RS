@@ -1,4 +1,4 @@
-import { exec } from 'kernelsu-alt'
+import { exec } from '../utils/exec'
 import type { Cli } from '../cli'
 
 /** POSIX single-quote a value so it survives the root shell verbatim. */
@@ -114,7 +114,7 @@ export class TaEnhanced {
   async init(): Promise<TaEnhancedInit | null> {
     const bin = await this.#binary()
     try {
-      const result = await exec(`'${bin}' webui-init 2>/dev/null`)
+      const result = await exec(`'${bin}' webui-init 2>/dev/null`, 20000)
       if (result.errno !== 0) return null
       const raw = result.stdout.trim()
       if (!raw) return null
@@ -144,7 +144,7 @@ export class TaEnhanced {
   async keyboxFetch(): Promise<{ ok: boolean; detail?: string }> {
     const bin = await this.#binary()
     try {
-      const result = await exec(`'${bin}' keybox fetch 2>&1`)
+      const result = await exec(`'${bin}' keybox fetch 2>&1`, 180000)
       const output = result.stdout
       if (result.errno !== 0) {
         const line = output.trim().split('\n').filter(Boolean).pop()
@@ -164,7 +164,7 @@ export class TaEnhanced {
   async vbhashShow(): Promise<string | null> {
     const bin = await this.#binary()
     try {
-      const result = await exec(`'${bin}' vbhash show 2>/dev/null`)
+      const result = await exec(`'${bin}' vbhash show 2>/dev/null`, 15000)
       if (result.errno !== 0) return null
       const value = result.stdout.trim()
       const hash = value && value !== 'no valid hash stored' ? value : null
@@ -178,7 +178,7 @@ export class TaEnhanced {
   async vbhashExtract(): Promise<boolean> {
     const bin = await this.#binary()
     try {
-      const result = await exec(`'${bin}' vbhash extract 2>&1`)
+      const result = await exec(`'${bin}' vbhash extract 2>&1`, 15000)
       return result.errno === 0
     } catch {
       return false
@@ -188,7 +188,7 @@ export class TaEnhanced {
   async vbhashPass(): Promise<boolean> {
     const bin = await this.#binary()
     try {
-      const result = await exec(`'${bin}' vbhash pass 2>&1`)
+      const result = await exec(`'${bin}' vbhash pass 2>&1`, 15000)
       return result.errno === 0
     } catch {
       return false
