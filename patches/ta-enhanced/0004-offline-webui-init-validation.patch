@@ -1,0 +1,126 @@
+# Patch: keep webui-init validation offline so the panel cannot freeze
+#
+# Upstream: Enginex0/tricky-addon-enhanced @ v5.53.1 (5c5e497)
+# Applies to: rust/src/keybox/validate.rs, rust/src/cli/webui_init.rs
+#
+# validate_full() fetches Google's attestation status
+# (https://android.googleapis.com/attestation/status) for the revocation
+# list. On blocked/unreachable networks that request stalls for a long time
+# (DNS and connect hangs), and the KernelSU-style WebUI bridge executes
+# commands synchronously in the @JavascriptInterface method - one stalled
+# fetch freezes the whole WebUI page (the app-list spinner never clears)
+# and the Enhanced panel stays on its loading placeholder forever. The
+# per-process CLI has no revocation cache, so every panel open / startup
+# preload triggered the fetch again.
+#
+# This patch splits validation into an online path (still used for user
+# initiated keybox fetching/custom installs, where the network is expected)
+# and an offline path that uses only the embedded revocation list.
+# webui-init now uses the offline path: the panel opens instantly and never
+# touches the network.
+#
+#diff --git a/rust/src/cli/webui_init.rs b/rust/src/cli/webui_init.rs
+index 0210c9b..45ffe9e 100644
+--- a/rust/src/cli/webui_init.rs
++++ b/rust/src/cli/webui_init.rs
+@@ -134,7 +134,10 @@ fn check_keybox() -> (bool, String, Vec<String>) {
+     if !path.exists() {
+         return (false, "none".into(), vec!["keybox.xml not found".into()]);
+     }
+-    match crate::keybox::validate::validate_file_full(path) {
++    // Offline validation: the panel is opened from the WebUI bridge, which
++    // executes commands synchronously - an online revocation fetch would
++    // freeze the whole page when the network is slow or blocked.
++    match crate::keybox::validate::validate_file_full_offline(path) {
+         Ok(report) => {
+             let root_type = report
+                 .keys
+#diff --git a/rust/src/keybox/validate.rs b/rust/src/keybox/validate.rs
+index 15f7f93..42bfd10 100644
+--- a/rust/src/keybox/validate.rs
++++ b/rust/src/keybox/validate.rs
+@@ -100,6 +100,19 @@ pub struct ValidationReport {
+ }
+ 
+ pub fn validate_full(data: &[u8]) -> Result<ValidationReport> {
++    validate_full_inner(data, true)
++}
++
++/// Offline validation: uses only the embedded revocation list and never
++/// touches the network. UI paths (webui-init / panel refresh) must use this
++/// variant - the online fetch below can stall for a long time on blocked or
++/// unreachable networks, and the WebUI bridge executes commands
++/// synchronously, so one stalled fetch freezes the whole page.
++pub fn validate_full_offline(data: &[u8]) -> Result<ValidationReport> {
++    validate_full_inner(data, false)
++}
++
++fn validate_full_inner(data: &[u8], allow_online_revocation: bool) -> Result<ValidationReport> {
+     if data.is_empty() {
+         bail!("keybox data is empty");
+     }
+@@ -114,7 +127,7 @@ pub fn validate_full(data: &[u8]) -> Result<ValidationReport> {
+         bail!("no <Keybox> elements found");
+     }
+ 
+-    let revocation = load_revocation();
++    let revocation = load_revocation(allow_online_revocation);
+     let entries_map = revocation
+         .data
+         .get("entries")
+@@ -168,6 +181,14 @@ pub fn validate_file_full(path: &Path) -> Result<ValidationReport> {
+     validate_full(&data)
+ }
+ 
++/// Offline variant of [`validate_file_full`]: embedded revocation list only,
++/// no network access (see [`validate_full_offline`]).
++pub fn validate_file_full_offline(path: &Path) -> Result<ValidationReport> {
++    let data = std::fs::read(path)
++        .with_context(|| format!("reading keybox file {}", path.display()))?;
++    validate_full_offline(&data)
++}
++
+ mod xml_model {
+     use serde::Deserialize;
+ 
+@@ -695,7 +716,24 @@ struct Revocation {
+     data: serde_json::Value,
+ }
+ 
+-fn load_revocation() -> Revocation {
++fn embedded_revocation(online_error: Option<String>) -> Revocation {
++    let data = serde_json::from_slice(EMBEDDED_REVOCATION)
++        .unwrap_or_else(|_| serde_json::json!({"entries": {}}));
++    Revocation {
++        source: RevocationSource::Embedded,
++        online_error,
++        data,
++    }
++}
++
++fn load_revocation(allow_online: bool) -> Revocation {
++    // UI-invoked validation must stay offline: the Google status fetch below
++    // can hang for minutes on blocked networks (DNS/connect stalls) and the
++    // WebUI bridge runs commands synchronously, freezing the page with it.
++    if !allow_online {
++        return embedded_revocation(None);
++    }
++
+     static CACHE: OnceLock<Mutex<Option<(Instant, Revocation)>>> = OnceLock::new();
+     let cache = CACHE.get_or_init(|| Mutex::new(None));
+     if let Ok(guard) = cache.lock() {
+@@ -713,13 +751,7 @@ fn load_revocation() -> Revocation {
+         },
+         Err(e) => {
+             warn!("revocation online fetch failed, using embedded: {e}");
+-            let data = serde_json::from_slice(EMBEDDED_REVOCATION)
+-                .unwrap_or_else(|_| serde_json::json!({"entries": {}}));
+-            Revocation {
+-                source: RevocationSource::Embedded,
+-                online_error: Some(e.to_string()),
+-                data,
+-            }
++            embedded_revocation(Some(e.to_string()))
+         }
+     };
+     if let Ok(mut guard) = cache.lock() {
