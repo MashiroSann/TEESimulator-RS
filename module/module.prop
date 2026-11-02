@@ -1,7 +1,9 @@
 id=tricky_store
-name=TEESimulator-RS
-version=${REPLACEMEVER}
-versionCode=${REPLACEMEVERCODE}
-author=JingMatrix, Enginex0, KOWX712
-description=Software simulation for Android hardware-backed key pairs with key attestation; bundles the Tricky Addon WebUI for target list and keybox management
-updateJson=${REPLACEMEUPDATEJSON}
+name=AlwaysStrong
+version=v1.0.6
+versionCode=106
+author=Evokerr, JingMatrix, Enginex0, osm0sis, KOWX712, MashiroSann
+description=Strong Play Integrity in one drop-in module. TEESimulator-RS (MashiroSann fork) + PlayIntegrityFork, auto-refreshed. Tap Action.
+updateJson=https://raw.githubusercontent.com/MashiroSann/TEESimulator-RS/alwaysstrong/update.json
+support=https://github.com/MashiroSann/TEESimulator-RS
+banner=banner.png

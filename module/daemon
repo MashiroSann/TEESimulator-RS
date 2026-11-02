@@ -1,14 +1,16 @@
 #!/system/bin/sh
+# Modified TEESimulator-RS daemon launcher.
+# Loads tee_classes.dex instead of classes.dex so the PlayIntegrityFork
+# zygisk module (which reads classes.dex from the module root) can coexist.
 
 MODDIR=$1
 
-# Determine classpath
-if [ -f "$MODDIR/classes.dex" ]; then
-    CLASSPATH="$MODDIR/classes.dex"
+if [ -f "$MODDIR/tee_classes.dex" ]; then
+    CLASSPATH="$MODDIR/tee_classes.dex"
 elif [ -f "$MODDIR/service.apk" ]; then
     CLASSPATH="$MODDIR/service.apk"
 else
-    echo "Error: Neither classes.dex nor service.apk found in $MODDIR"
+    echo "Error: tee_classes.dex / service.apk not found in $MODDIR"
     exit 1
 fi
 

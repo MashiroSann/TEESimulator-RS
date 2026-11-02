@@ -1,166 +1,102 @@
 name: Release
 
-# Manually triggered stable release ("Release latest").
+# Tag `v1.x` on the alwaysstrong branch (or run this workflow with a tag) and
+# the three installable zips are built on the runner and attached to the
+# release. Nothing is uploaded by hand.
 #
-# Flow:
-#   1. Build main via the reusable build workflow (WebUI + Release/Debug zips).
-#   2. Create the GitHub release tagged with the version embedded in the zips
-#      (v6.0.1-<count+5>), marked --latest, with all four zips attached
-#      (Release/Debug, each with and without the bundled enhanced backend).
-#   3. Commit the gradle-generated update manifests (module/update.json for
-#      the Enhanced package, module/update-noenh.json for NoEnhanced) and the
-#      upstream lastReleased markers back to main with [skip ci].
+#   AlwaysStrong-<ver>.zip           PlayIntegrityFork  + TEESimulator-RS
+#   AlwaysStrong-<ver>-inject.zip    PlayIntegrityFix   + TEESimulator-RS
+#   AlwaysStrong-<ver>-nopif.zip     PIF-less / Lite    + TEESimulator-RS
 #
-# Release notes follow the split convention: `### TEESimulator-RS 更新` and
-# `### Tricky Addon 更新` sections are emitted only when the corresponding
-# upstream has commits newer than the last released markers. A release without
-# upstream changes gets a short fallback body.
+# After publishing, the three update manifests on the branch are repointed at
+# the new tag so installed modules pick the release up through their manager.
 
 on:
+  push:
+    tags:
+      - 'v1.*'
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Build only, skip release and update-manifest commit"
-        type: boolean
-        default: false
+      tag:
+        description: 'Existing tag to publish (e.g. v1.0.6)'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
-concurrency:
-  group: release-latest
-  cancel-in-progress: false
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
-  build:
-    uses: ./.github/workflows/build.yml
-    permissions:
-      contents: read
-
   release:
-    needs: build
-    if: inputs.dry_run == false
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout the tag
+        uses: actions/checkout@v4
         with:
+          ref: ${{ env.TAG }}
           fetch-depth: 0
 
-      - name: "Guard: only release from main"
-        run: |
-          if [ "${{ github.ref_name }}" != "main" ]; then
-            echo '::error::Release must be dispatched from the main branch'
-            exit 1
-          fi
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zip unzip
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v8
+      - name: Use committed native binaries (skip the cargo-ndk step in CI)
+        run: find native -path '*/prebuilt/*' -type f -exec touch {} +
+
+      - name: Build the three lines
+        run: bash build.sh
+
+      - name: Release notes from CHANGELOG
+        run: |
+          set -eu
+          {
+            echo "## AlwaysStrong ${TAG}"
+            echo
+            awk -v v="## ${TAG}" '
+              $0==v {f=1; next}
+              /^## / {f=0}
+              f {print}
+            ' CHANGELOG.md
+          } > RELEASE_NOTES.md
+          if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
+            printf '## AlwaysStrong %s\n\nSee CHANGELOG.md.\n' "$TAG" > RELEASE_NOTES.md
+          fi
+          cat RELEASE_NOTES.md
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
         with:
-          pattern: '{TEESimulator-RS-release-zip,TEESimulator-RS-debug-zip,module-update-json}'
-          merge-multiple: true
-          path: artifacts
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            out/AlwaysStrong-*.zip
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
 
-      - name: Resolve version and tag state
-        id: ver
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
+      - name: Point the update manifests at this release
+        # Installed modules poll their updateJson, so it has to name a release
+        # that already exists - hence this runs after publish. A failure here
+        # costs an edit, not the build.
+        continue-on-error: true
         run: |
-          VER="$VERSION"
-          test -n "$VER" || { echo '::error::build workflow did not report a version'; exit 1; }
-          # Double-check the tag matches the artifact actually downloaded.
-          ls artifacts/TEESimulator-RS-"$VER"-Release-Enhanced.zip >/dev/null
-          if gh release view "$VER" >/dev/null 2>&1; then
-            echo "::notice::Release $VER already exists - nothing to do."
-            echo "exists=yes" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=no" >> "$GITHUB_OUTPUT"
-          fi
-          echo "version=$VER" >> "$GITHUB_OUTPUT"
-          echo "Version: $VER (commit $GITHUB_SHA)"
-
-      - name: Generate release notes
-        if: steps.ver.outputs.exists == 'no'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TEES_FROM=$(jq -r '.teesimulator.lastReleasedSha' .github/upstream-state.json)
-          TA_FROM=$(jq -r '.trickyAddon.lastReleasedSha' .github/upstream-state.json)
-          TEES_TO=$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)
-          TA_TO=$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)
-          TEES_REPO=Enginex0/TEESimulator-RS TEES_FROM_SHA="$TEES_FROM" TEES_TO_SHA="$TEES_TO" \
-          TA_REPO=KOWX712/Tricky-Addon-Update-Target-List TA_FROM_SHA="$TA_FROM" TA_TO_SHA="$TA_TO" \
-          bash .github/scripts/sync-notes.sh > /tmp/notes.md || true
-          if [ ! -s /tmp/notes.md ]; then
-            echo "_本次发布无上游更新。_" > /tmp/notes.md
-          fi
-          echo "--- notes ---"; cat /tmp/notes.md
-
-      - name: Create release
-        if: steps.ver.outputs.exists == 'no'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VER: ${{ steps.ver.outputs.version }}
-        run: |
-          gh release create "$VER" \
-            --target "$GITHUB_SHA" \
-            --title "$VER" \
-            --latest \
-            --notes-file /tmp/notes.md \
-            artifacts/TEESimulator-RS-"$VER"-Release-Enhanced.zip \
-            artifacts/TEESimulator-RS-"$VER"-Release-NoEnhanced.zip \
-            artifacts/TEESimulator-RS-"$VER"-Debug-Enhanced.zip \
-            artifacts/TEESimulator-RS-"$VER"-Debug-NoEnhanced.zip
-
-      - name: Commit update manifests and released markers
-        if: steps.ver.outputs.exists == 'no'
-        env:
-          VER: ${{ steps.ver.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # upload-artifact strips the leading "module/" path component, so the
-          # artifact may land as artifacts/*.json (not artifacts/module/*.json).
-          # Both update manifests are committed: the Enhanced package tracks
-          # update.json, the NoEnhanced package tracks update-noenh.json.
-          if [ -f artifacts/module/update.json ]; then
-            JSON_SRC=artifacts/module
-          else
-            JSON_SRC=artifacts
-          fi
-          for f in update.json update-noenh.json; do
-            if [ -f "$JSON_SRC/$f" ]; then
-              cp "$JSON_SRC/$f" "module/$f"
-            else
-              echo "::error::module/$f artifact missing"; exit 1
-            fi
-          done
-          jq --arg t "$(jq -r '.teesimulator.lastSyncedSha' .github/upstream-state.json)" \
-             --arg a "$(jq -r '.trickyAddon.lastSyncedSha' .github/upstream-state.json)" \
-             '.teesimulator.lastReleasedSha = $t | .trickyAddon.lastReleasedSha = $a' \
-             .github/upstream-state.json > /tmp/state.json
-          mv /tmp/state.json .github/upstream-state.json
-          # Changelog: the root manager shows module/changelog.md in its update
-          # dialog. Manual maintenance releases have a curated section written
-          # before the workflow runs; sync-driven releases get one generated
-          # from the release notes.
-          if ! grep -qF "## TEESimulator-RS $VER" module/changelog.md; then
-            {
-              echo "## TEESimulator-RS $VER"
-              echo
-              cat /tmp/notes.md
-              echo
-            } > /tmp/changelog.md
-            cat module/changelog.md >> /tmp/changelog.md
-            mv /tmp/changelog.md module/changelog.md
-            echo "Prepended generated changelog section for $VER"
-          else
-            echo "Changelog already has a section for $VER"
-          fi
-          git add module/update.json module/update-noenh.json module/changelog.md .github/upstream-state.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(release): bump update manifests to $VER [skip ci]"
-            git push origin HEAD:main
-          else
-            echo "update manifests and markers already up to date."
-          fi
+          set -eu
+          ver=$(sed -n 's/^version=//p' module/module.prop)
+          code=$(sed -n 's/^versionCode=//p' module/module.prop)
+          git fetch origin alwaysstrong
+          git checkout -B alwaysstrong origin/alwaysstrong
+          write_manifest() {
+            printf '{\n  "version": "%s",\n  "versionCode": %s,\n  "zipUrl": "https://github.com/%s/releases/download/%s/%s",\n  "changelog": "https://raw.githubusercontent.com/%s/alwaysstrong/CHANGELOG.md"\n}\n' \
+              "$ver" "$code" "$GITHUB_REPOSITORY" "$TAG" "$2" "$GITHUB_REPOSITORY" > "$1"
+          }
+          write_manifest update.json        "AlwaysStrong-${ver}.zip"
+          write_manifest update-inject.json "AlwaysStrong-${ver}-inject.zip"
+          write_manifest update-nopif.json  "AlwaysStrong-${ver}-nopif.zip"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add update.json update-inject.json update-nopif.json
+          git diff --cached --quiet && { echo "manifests already current"; exit 0; }
+          git commit -m "chore: point update manifests at $TAG"
+          git push origin alwaysstrong

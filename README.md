@@ -1,218 +1,162 @@
-<h1 align="center">TEESimulator-RS</h1>
-<p align="center"><b>Pass hardware security checks on a rooted Android phone</b></p>
-<p align="center">
-  <a href="https://github.com/Enginex0/TEESimulator-RS/actions/workflows/build.yml"><img src="https://github.com/Enginex0/TEESimulator-RS/actions/workflows/build.yml/badge.svg" alt="Build"></a>
-  <img src="https://img.shields.io/badge/Android-10%2B-green?logo=android" alt="Android 10+">
-  <a href="https://t.me/superpowers9"><img src="https://img.shields.io/badge/Telegram-community-blue?logo=telegram" alt="Telegram"></a>
-</p>
+<div align="center">
 
-<p align="center">
-  <b>English</b> | <a href="README.zh-CN.md">简体中文</a>
-</p>
+> **Integration build** — this branch (`alwaysstrong`) repacks AlwaysStrong around the
+> [`MashiroSann/TEESimulator-RS`](https://github.com/MashiroSann/TEESimulator-RS) engine
+> (Release-NoEnhanced core, arm64-v8a). The module scripts, automation and WebUI are
+> AlwaysStrong's; the standalone TEESimulator-RS WebUI is not shipped. Builds run on
+> GitHub Actions.
 
----
+<img src="banner.png" alt="AlwaysStrong" width="700">
 
-> [!NOTE]
-> This is a fork of [JingMatrix/TEESimulator](https://github.com/JingMatrix/TEESimulator). It adds certificate generation written in Rust, generated keys that survive reboots, and attestation behavior that matches stock Android. See the upstream repo for the original project.
+<br>
+<br>
 
-## Changes in this fork
+[![Release](https://img.shields.io/badge/releases-GitHub-2ea44f)](https://github.com/MashiroSann/TEESimulator-RS/releases)
+[![Build](https://github.com/MashiroSann/TEESimulator-RS/actions/workflows/build.yml/badge.svg?branch=alwaysstrong)](https://github.com/MashiroSann/TEESimulator-RS/actions/workflows/build.yml)
+[![License](https://img.shields.io/badge/license-GPL--3.0-orange)](LICENSE)
 
-Beyond upstream, this fork makes the simulator answer like real KeyMint hardware when an app probes for a fake security chip:
+<img src="screenshots/webui.jpg" width="30%" alt="WebUI"> &nbsp; <img src="screenshots/advanced.jpg" width="30%" alt="Advanced"> &nbsp; <img src="screenshots/languages.jpg" width="30%" alt="Translated into 15 languages">
 
-- **Mixed-purpose attest keys are rejected.** A `generateKey` request that combines `ATTEST_KEY` with any other purpose now fails with `INCOMPATIBLE_PURPOSE` (`-3`), exactly as real hardware does. Upstream created the key instead.
-- **Deliberate errors keep their real code.** A rejection raised inside the simulator is returned with the KeyMint error code a real chip would answer with, instead of being collapsed to `SECURE_HW_COMMUNICATION_FAILED` (`-49`).
-- **Error names and fallbacks match AOSP.** The codes and text answered to apps were corrected against the official KeyMint `ErrorCode` AIDL table.
-- **RSA-OAEP MGF1 follows the spec.** An operation that omits the MGF1 digest defaults to SHA-1 and is rejected with `INCOMPATIBLE_MGF_DIGEST` (`-78`) when the key authorizes a different digest set, and `Digest.NONE` is rejected with `UNSUPPORTED_MGF_DIGEST` (`-79`). For real hardware keys, the key's allowed MGF1 digests are cached when it is generated and the same rules are applied to its operations, so a loose vendor implementation cannot be told apart from a strict one.
-- **Bundled Tricky Addon WebUI.** The module now ships the [Tricky Addon](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) WebUI (upstream `cf16784`, v5.0-beta.4, Apache-2.0). Root managers that support module WebUIs (KernelSU, KernelSU Next, APatch) show it as a second button next to the Action button, served from `webroot/`: edit the target list, manage `keybox.xml` (AOSP / local file / community repo), and review security patch settings. The Action button keeps the original persistent-key management. The WebUI detects this fork and uses its `target.txt` + `security_patch.txt` layout, preserving per-package `[pkg]` patch sections on save.
-- **App attest keys are keybox-rooted.** A key whose sole purpose is `PURPOSE_ATTEST_KEY` is issued by the keybox even without a challenge, like real hardware. Apps that attest their own keys with an app-generated attestation key still chain to the Google root instead of a self-signed "unknown" root.
-- **Embedded automation backend.** The zip now embeds the [Tricky Addon Enhanced](https://github.com/Enginex0/tricky-addon-enhanced) backend (GPL-3.0, pinned `v5.53.1` plus a small validator compatibility patch in `patches/ta-enhanced/`, cross-compiled from source for arm64-v8a at packaging time; see `.github/ta-enhanced.json`). After install it runs as a daemon beside the engine and automates keybox rotation (Yurikey / KOW / custom), security-patch dates, VBHash spoofing, inotify-based target-list management and conflict reporting, and it can live-update this module's description in the root manager. Everything is controlled from the bundled WebUI (⋮ menu → **Enhanced**). It only reports conflicting modules; it never removes them by itself.
+<sub>Built-in WebUI on KernelSU / APatch: hourly auto-update toggles, an Advanced tab, translated into 15 languages.</sub>
 
-## What it does
+</div>
 
-Some Android apps refuse to run on a rooted phone. They ask the phone to prove it still has a genuine security chip, a check called hardware attestation. A rooted phone normally fails that check.
+# AlwaysStrong
 
-TEESimulator makes it pass. Android runs a system process named `keystore2` that answers these proof requests. TEESimulator sits in front of `keystore2`, watches for the requests apps make to create keys and read their certificates, and builds the proof itself: a full chain of certificates signed by your `keybox.xml`. To the app, the phone looks genuine.
+One-flash `STRONG` Play Integrity for Magisk / KernelSU / APatch. It bundles [TEESimulator-RS](https://github.com/MashiroSann/TEESimulator-RS) and [PlayIntegrityFork](https://github.com/osm0sis/PlayIntegrityFork) into a single module so you don't have to stack and wire them up yourself.
 
-It replaces TrickyStore and its forks completely. It reads config from the same files, so you can switch without moving anything, but the internals are rewritten: certificates are generated in Rust, keys are saved across reboots, and each app gets its own limit on how fast it can request hardware-backed keys.
+To use this module you need one of the following (latest versions), with a Zygisk implementation installed:
 
-## Requirements
+- [Magisk](https://github.com/topjohnwu/Magisk) with Zygisk enabled — a standalone [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) / [ReZygisk](https://github.com/PerformanC/ReZygisk) / [NeoZygisk](https://github.com/JingMatrix/NeoZygisk) is recommended over Magisk's built-in Zygisk, which is more easily detected
+- [KernelSU](https://github.com/tiann/KernelSU) or [SukiSU Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) or [NeoZygisk](https://github.com/JingMatrix/NeoZygisk) module installed
+- [APatch](https://github.com/bmax121/APatch) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) or [NeoZygisk](https://github.com/JingMatrix/NeoZygisk) module installed
 
-> [!IMPORTANT]
-> You need a valid `keybox.xml`. This is the file used to sign the proof. Without it, TEESimulator can only produce software-only certificates, which strict apps reject.
+Android 10+ (SDK 29) is required. 
 
-1. Android 10 or newer
-2. A root manager: KernelSU, Magisk, or APatch
-3. A `keybox.xml` file at `/data/adb/tricky_store/keybox.xml`
+## Support
 
-## Quick start
+Open an issue at [MashiroSann/TEESimulator-RS](https://github.com/MashiroSann/TEESimulator-RS/issues) for this integration build. AlwaysStrong itself is maintained by [Evokerr](https://gitlab.com/Evokerr/AlwaysStrong).
 
-1. Download the latest ZIP from [Releases](https://github.com/MashiroSann/TEESimulator-RS/releases).
-2. Install it with your root manager, then reboot.
-3. Put your `keybox.xml` at `/data/adb/tricky_store/keybox.xml`.
-4. List the apps you want to cover in `/data/adb/tricky_store/target.txt` — or tap the module's Action button to open the bundled WebUI.
-5. Check that it works with Play Integrity or the Key Attestation Demo app.
+## Installation
 
-## How it works
+1. Install a Zygisk implementation (Zygisk Next / ReZygisk / NeoZygisk).
+2. Download the latest ZIP from [Releases](https://github.com/MashiroSann/TEESimulator-RS/releases).
+3. Flash it in your root manager and reboot.
+4. Open the module and tap **Action**.
+5. Check your verdict with a checker (Play Integrity API Checker, YASNAC, Simple PIC).
 
-```
-   App
-    |  asks the phone to prove it has real security hardware
-    v
-+----------------------------------------------------+
-| keystore2  (the Android process that answers)      |
-|                                                    |
-|   ioctl  <- TEESimulator hooks the call here       |
-|     |                                              |
-|     v                                              |
-|   builds a certificate chain and signs it          |
-|   with your keybox.xml                             |
-+----------------------------------------------------+
-    |  the signed chain goes back to the app
-    v
-   App  ->  sees a genuine, hardware-backed device
-```
+The first Action tap fetches a working keybox and a fresh Pixel fingerprint and restarts Play Integrity, so there is no manual keybox step. The installer also removes conflicting standalone modules at install time (TrickyStore, PlayIntegrityFix/Fork, TEESimulator, playcurl/playcurlNEXT, SafetyNet Fix, MagiskHidePropsConf, Tricky Addon, Yurikey, and a few others).
 
-**Certificate generation in Rust.** A native library, `libcertgen.so`, builds the X.509 certificate chains in Rust with the `ring` crypto library, encoding the bytes by hand in DER, the standard certificate format. Three key types fall outside `ring`'s support (the P-224, P-521, and Curve25519 curves); for those it falls back to Java's BouncyCastle.
+### Which build to download
 
-**Hooking keystore2.** Inside the `keystore2` process, TEESimulator redirects `ioctl`, the low-level system call Android uses to pass messages between processes. It does this with `lsplt`, a hooking library. From there it can read and answer three kinds of request: creating a key, importing a key, and fetching a key's certificate.
+**If you're not sure, download `AlwaysStrong-<version>.zip` — the plain one with no suffix.** It's the default and passes `STRONG` on most devices.
 
-**Matching stock Android.** The output matches what a real device produces. Keys that are not attested get self-signed certificates. The fields inside the attestation record keep the same order. Fields that only exist on certain Android versions appear only on those versions. The same usage checks run before a key is used.
+Every release ships three zips. They differ only in how the Pixel fingerprint is spoofed; all three use the same TEESimulator-RS keystore and the same automated keybox.
 
-**Keys that survive reboots.** Generated keys are written to disk and stay valid after a restart. File locking stops two writers from corrupting the store.
+| Download | Play Integrity engine | Choose it when |
+|---|---|---|
+| `AlwaysStrong-<ver>.zip` | PlayIntegrityFork | **Default — start here.** |
+| `AlwaysStrong-<ver>-inject.zip` | PlayIntegrityFix (inject-s) | The default doesn't reach `STRONG` on your device. |
+| `AlwaysStrong-<ver>-nopif.zip` | **none (Lite)** | The bundled PIF conflicts with Google Play Services (Play Store crashes, "couldn't load" account screen, missing-dependency errors). You keep hardware attestation + the automated keybox, but there is **no fingerprint spoof** — bring your own PlayIntegrityFork / Fix if you need one; the module detects it and keeps it in sync. |
 
-**Per-app rate limit.** Each app may request at most 2 hardware-backed keys per 30 seconds, and only 2 at a time. Past that, it receives a software-only certificate.
+- **Install only one at a time.** Switching builds means flashing the other zip over the top.
+- **Auto-update:** all three update themselves in place through your root manager.
+- **ABI:** every build installs on arm64-v8a, armeabi-v7a, x86 and x86_64, but PlayIntegrityFix inject-s has no x86 zygisk — on x86 / x86_64 the `-inject` build can't spoof Play Integrity (it says so at install). On x86 use the default or the Lite build.
+
+<details>
+<summary><b>Optional keystore engines: TrickyStoreOSS (<code>-TSOSS</code>) and TEESimulator by JingMatrix (<code>-TEESIM</code>)</b></summary>
+
+The keystore half can also run on the open-source [TrickyStoreOSS](https://github.com/beakthoven/TrickyStoreOSS) or on the original [TEESimulator by JingMatrix](https://github.com/JingMatrix/TEESimulator), for any of the three lines above (`-TSOSS`, `-inject-TSOSS`, `-nopif-TSOSS`, `-TEESIM`, `-inject-TEESIM`, `-nopif-TEESIM`). These are **nightly-only, never in a release**: download the latest nightly of each one straight from the [nightly.link table in ADVANCED.md](docs/ADVANCED.md#optional-keystore-engines--tsoss--teesim) (one artifact per variant), or build them yourself with `./build.sh --engine trickystoreoss` / `--engine teesim`. They don't auto-update, and `-TEESIM` is 64-bit only.
+
+Details, caveats (in particular Lite + `-TEESIM`) and how to build them: **[docs/ADVANCED.md](docs/ADVANCED.md)**.
+
+</details>
+
+## Features
+
+- **One flash, `STRONG`.** TEESimulator-RS + PlayIntegrityFork in a single module. No stacking, no manual wiring.
+- **Keybox on tap.** The first **Action** fetches a working keybox automatically.
+- **A fingerprint that never goes stale.** Every Action pulls a fresh Pixel fingerprint and matching security patch, and a background service does the same **every hour** (interval configurable, each toggle-able from the WebUI).
+- **Hands-off keybox too.** The hourly service re-checks the keybox and only swaps it in when a newer one is available.
+- **Auto target.** A native watcher follows package changes via inotify: install a new app and it's added to the attestation target instantly.
+- **Xposed-aware.** LSPosed / Xposed managers are kept out of the target list, since attesting through a hooked process breaks `STRONG`.
+- **Conflict resolution.** Known conflicting modules (TrickyStore, other PIF / TEE forks, SafetyNet Fix, MagiskHidePropsConf, …) are disabled at install and on every boot.
+- **WebUI Advanced tab.** Import your own fingerprint (`pif.json` / `pif.prop`), flip any Play Integrity spoof flag by its real name, add custom target packages, or switch to your own keybox. **Reset to defaults** at the bottom undoes every toggle and re-runs Action, keeping your keybox.
+
+<details>
+<summary><b>More: GMS kill, security-patch sync, one clean module</b></summary>
+
+- **GMS kill.** Force-stops DroidGuard (`com.google.android.gms.unstable`) and clears the Play Store on each refresh, so a new fingerprint or keybox takes effect without a reboot.
+- **Security-patch sync.** Keeps the OS / vendor / boot security-patch levels reported in attestation aligned with the spoofed fingerprint.
+- **One clean module.** PIF is binary-patched to run inside `tricky_store` — it never litters a separate `playintegrityfix` folder under `/data/adb/modules`.
+- **Lite builds drive your own PIF.** On a `-nopif` build the Advanced spoof toggles edit a standalone PlayIntegrityFork / PlayIntegrityFix you installed yourself, and its fingerprint is mirrored into the attested identity.
+
+</details>
+
+<details>
+<summary><b>About the module: how the two halves are glued together</b></summary>
+
+AlwaysStrong is two parts merged into one module:
+
+- **TEESimulator-RS** intercepts Binder IPC inside the `keystore2` process and builds full attestation certificate chains from your keybox, so apps that verify hardware key attestation see a legitimate TEE. It is not a fork of TrickyStore; it reuses the same `/data/adb/tricky_store` config layout for drop-in compatibility, but the internals (native Rust certgen, `lsplt` interception, key persistence) are different.
+- **PlayIntegrityFork** injects a `classes.dex` to modify `android.os.Build` fields and hooks native code to spoof system properties, only to Google Play Services' DroidGuard (Play Integrity).
+
+TEESimulator's `classes.dex` is renamed to `tee_classes.dex` so it doesn't collide with PIF's, and PIF's hardcoded module paths are binary-patched to point at `/data/adb/modules/tricky_store` — it never creates a separate `playintegrityfix` folder. The module id stays `tricky_store` so existing tooling and tutorials keep working unchanged.
+
+</details>
+
+## The Action button
+
+Triggered from your root manager, or by running `sh action.sh` in a root shell. Each tap rebuilds `target.txt`, refreshes the keybox, pulls a fresh Pixel fingerprint and security patch, and restarts DroidGuard and the Play Store. The verdict updates a few seconds later; no reboot is needed. Every network step is hard-bounded, so a dead network shows "trying with fallback" and the Action still finishes — it never sits on a blank screen.
+
+The same refresh also runs on its own in the background every hour (interval configurable from the WebUI), so the module keeps passing with zero manual upkeep.
 
 ## Configuration
 
-All config files live in `/data/adb/tricky_store/`. TEESimulator reloads them the moment you save, so a reboot is not needed.
+Everything lives at `/data/adb/tricky_store/` and is reloaded automatically when changed. The Action button keeps it current, so most users never need to touch any of it.
 
-### target.txt
+- **`keybox.xml`** — the attestation keybox, fetched automatically on the first Action tap. To use your own, switch on *Custom keybox* in the WebUI (or place the file here) and it won't be overwritten. To point the auto-refresh at a different mirror, set `KEYBOX_BASE_URL` for `keybox_fetch.sh`; the script validates the payload before replacing the current file.
+- **`alwaysstrong/`** — everything the module itself keeps, in one directory beside the engine's files: `config` (every setting the WebUI writes, one `key=value` line each — `auto_fp=0`, `interval_sec=1800`), `apps.map` (per-app keybox and mode), `packages`, `state`, `logs/`. Editing `config` by hand works, and deleting it puts every setting back to default. Upgrades import the old layout, where each switch was its own marker file (`no_auto_fp`, `hourly_interval_sec`, ...), and clear those away.
 
-Lists the apps TEESimulator handles, one package name per line. A suffix sets how each app is handled.
-
-| Suffix | What it does |
-|--------|--------------|
-| `!` | Always make a software key |
-| `?` | Keep the real hardware key, patch only its certificate |
-| none | Decide automatically |
-
-To use more than one keybox, add a `[filename.xml]` header above the apps that should use that file:
-
-```
-com.google.android.gms!
-io.github.vvb2060.keyattestation?
-
-[aosp_keybox.xml]
-com.google.android.gsf
-```
-
-### security_patch.txt
-
-Sets the security patch dates reported in the attestation certificates. Global defaults go at the top. Override them for one app with a `[package.name]` header.
-
-| Key | What it sets |
-|-----|--------------|
-| `system` | OS patch level |
-| `vendor` | Vendor patch level |
-| `boot` | Boot and kernel patch level |
-| `all` | All three at once |
-
-Accepted values: `today`, a `YYYY-MM-DD` template, `no` to omit the field, `device_default`, or `prop` to read the value from a system property.
-
-```
-system=YYYY-MM-05
-vendor=device_default
-boot=no
-
-[com.google.android.gms]
-system=2025-10-01
-```
-
-### boot_props_mode
-
-Controls global `ro.boot.*` property spoofing. Values: `auto` (default), `force`, or `disable`.
-
-In `auto`, Oplus-family devices (OnePlus/OPPO/realme/Oplus) skip boot-state prop spoofing to avoid conflicts with vendor TEE services such as ultrasonic fingerprint calibration. Create `/data/adb/tricky_store/boot_props_mode` with `force` to restore the old behavior, or `disable` to turn it off on any device.
-
-## Building from source
-
-You need JDK 21, the Android SDK and NDK 29, Rust (stable) with the `aarch64-linux-android` target, and `cargo-ndk`.
+## Building
 
 ```bash
-git clone --recursive https://github.com/MashiroSann/TEESimulator-RS.git
-cd TEESimulator-RS
-cd webui && pnpm install --frozen-lockfile && pnpm run build && cd ..   # emits module/webroot
-./gradlew zipRelease zipDebug
+./build.sh                          # the three release zips (Fork / inject / Lite)
+./build.sh --variant fork           # just one line
+./build.sh --engine trickystoreoss  # optional: the -TSOSS keystore engine
 ```
 
-The ZIPs land in `out/`. Gradle runs `cargo ndk` for you to cross-compile `libcertgen.so`, and native libraries are built for `arm64-v8a` only. The bundled WebUI is a Vite/TypeScript app under `webui/` (Node.js 20+ and pnpm required); it must be built before packaging because `customize.sh` aborts when `webroot/index.html` is missing. To build on CI instead, push to `main` or run Actions > Build > Run workflow.
+`build.sh` downloads the pinned upstream release ZIPs, overlays the glue scripts in `module/`, and produces the installable ZIPs (on Windows run it from WSL or Git Bash). Engines, repo layout, native binaries and the upstream auto-release: **[docs/ADVANCED.md](docs/ADVANCED.md)**.
 
-On Windows, `build-module.ps1` pins the JDK, SDK, NDK, Rust and Node toolchain paths and runs the same build, including the WebUI:
+## Reproducible builds
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build-module.ps1              # Release + Debug
-powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -ReleaseOnly # Release only
-powershell -ExecutionPolicy Bypass -File .\build-module.ps1 -SkipWebui   # reuse module\webroot
-```
-
-## Automated upstream sync and releases
-
-This fork tracks two upstreams plus a pinned backend with GitHub Actions:
-
-- [Enginex0/TEESimulator-RS](https://github.com/Enginex0/TEESimulator-RS) — the core simulator this fork is based on.
-- [KOWX712/Tricky-Addon-Update-Target-List](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) — the bundled `webui/` sources and support files.
-- [Enginex0/tricky-addon-enhanced](https://github.com/Enginex0/tricky-addon-enhanced) — the embedded automation backend, pinned in `.github/ta-enhanced.json`. The source is fetched at the pinned commit and cross-compiled while packaging; the daily check notifies when upstream tags a newer release so the pin can be bumped.
-
-| Workflow | Trigger | What it does |
-|---|---|---|
-| `Build` | push to `main` (module paths), pull requests, manual | Compile check only — builds the WebUI, the embedded backend and the module zips, never publishes |
-| `Check Upstream Updates` | daily schedule + manual | Opens/updates an `upstream-sync` issue when an upstream gains commits or a newer backend release appears; closes it once everything is in sync |
-| `Sync Upstreams` | **manual** | Merges both upstreams into a rebuilt `debug` branch, builds it, opens/updates a PR to `main`, and publishes a pre-release (`v6.0.1-<n>-pre` with Release + Debug zips) |
-| `Release` | **manual** (from `main`) | Builds `main`, publishes the latest stable release, and commits the regenerated `module/update.json` back with `[skip ci]` |
-
-Versions follow `v6.0.1-<commit count + 5>`; the tag, the version inside the zips, and `module/update.json` always agree. Only the stable release touches `module/update.json`, so pre-releases never reach users' update channels.
-
-### Sync flow
-
-1. Actions → **Sync Upstreams** → Run workflow. `dry_run` builds and pushes the draft `debug` branch without opening a PR or publishing a pre-release.
-2. The workflow merges Enginex0 (conflicts in repo-owned files such as `.github/**`, `build-module.ps1` and `module/update.json` resolve to this fork) and overlay-syncs Tricky Addon: `webui/` and the `module` support files are copied, while the six customized `webui` sources are 3-way merged. Conflicts elsewhere stop the run.
-3. When the build passes, review the PR and pre-release, flash the pre-release zip if you want a device check, then merge the PR.
-4. Actions → **Release** → Run workflow to publish the stable release (marked Latest).
-
-Release notes use two sections — `### TEESimulator-RS 更新` and `### Tricky Addon 更新` — emitted only when that upstream actually has new commits.
-
-### When something goes wrong
-
-- Conflicts or a failed build open/update an issue labeled `upstream-sync` with a link to the run; `main` and the update channel are never touched.
-- Retry: fix the cause (or resolve conflicts on the `debug` branch), then re-run **Sync Upstreams**.
-- Withdraw a pre-release: `gh release delete v6.0.1-<n>-pre --yes --cleanup-tag`, and close the PR if needed.
-- Stable releases: re-running `Release` for an existing tag is a no-op; to replace one, delete the release and tag first, then re-run.
-
-## Compatibility
-
-| Root manager | Status |
-|---|---|
-| KernelSU | Tested, including the Action button and lifecycle scripts |
-| Magisk | Supported |
-| APatch | Supported |
-
-## Community
-
-<p align="center">
-  <a href="https://t.me/superpowers9">
-    <img src="https://img.shields.io/badge/SuperPowers_Telegram-Join-blue?style=for-the-badge&logo=telegram" alt="Telegram">
-  </a>
-</p>
+Nothing in a release is uploaded by hand: `.github/workflows/release.yml` builds the zips
+from the tagged tree on a GitHub runner. The two shipped binaries, `asfetch` and
+`aswatcher`, are plain Rust with full source in this repo under `native/asfetch` and
+`native/watcher`, not third-party blobs. Rebuild them from the **Native binaries** workflow
+on the Actions tab, or locally with `scripts/build-asfetch.sh` and `scripts/build-watcher.sh`.
 
 ## Credits
 
-- [JingMatrix](https://github.com/JingMatrix/TEESimulator) for the original TEESimulator and its interception design
-- [KOWX712](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) for the Tricky Addon WebUI bundled with this fork (Apache-2.0)
-- [Enginex0](https://github.com/Enginex0/tricky-addon-enhanced) for the Tricky Addon Enhanced backend embedded in this fork (GPL-3.0)
-- [ring](https://github.com/briansmith/ring) for the Rust cryptography
-- [fatalcoder524](https://github.com/fatalcoder524) for contributions and collaboration
-- [huguangares](https://github.com/huguangares) for collaboration and testing
+<div align="center">
+<img src="screenshots/built-on.png" alt="AlwaysStrong stands on the shoulders of TEESimulator-RS and PlayIntegrityFork" width="600">
+</div>
+
+AlwaysStrong is combine of TEE-Simulator-RS + Play Integrity Fork
+
+- [JingMatrix](https://github.com/JingMatrix/TEESimulator) — original TEESimulator and keystore2 interception
+- [Enginex0](https://github.com/Enginex0/TEESimulator-RS) — TEESimulator-RS (Rust port, native certgen, AOSP-spec attestation)
+- [5ec1cff](https://github.com/5ec1cff/TrickyStore) — TrickyStore, which pioneered keystore interception and the config-dir layout reused here
+- [beakthoven](https://github.com/beakthoven/TrickyStoreOSS) — TrickyStoreOSS, the open-source keystore engine offered as a self-build option
+- [chiteroman](https://github.com/chiteroman) — original Play Integrity Fix
+- [osm0sis](https://github.com/osm0sis/PlayIntegrityFork) — PlayIntegrityFork, the maintained fork bundled here
+- [Displax](https://github.com/Displax/safetynet-fix) — module boot scripts forked into PIF
+- [daboynb](https://github.com/daboynb/playcurlNEXT) — fingerprint auto-refresh approach
+- [LSPlt](https://github.com/LSPosed/LSPlt) (PLT hooks) and [ring](https://github.com/briansmith/ring) (Rust crypto)
+- [KOWX712](https://github.com/KOWX712) — PlayIntegrityFix (inject-s), used by the `-inject` build, and KsuWebUIStandalone
+
+Packaging by [@evokerr](https://t.me/evokerr).
 
 ## License
 
-[GNU General Public License v3.0](LICENSE)
+GPL-3.0. AlwaysStrong bundles TEESimulator-RS (GPL-3.0), which makes the combined distribution GPL-3.0. See [LICENSE](LICENSE) and the upstream repos for full terms. Provided as-is, with no warranty; `STRONG` depends on a non-revoked hardware keybox, which the module cannot mint for you.

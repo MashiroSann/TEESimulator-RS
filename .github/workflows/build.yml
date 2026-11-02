@@ -1,196 +1,87 @@
 name: Build
 
-# Reusable build pipeline (called by sync.yml and release.yml) plus a
-# compile-check for regular pushes and PRs. This workflow NEVER publishes:
-# releases live in sync.yml (pre-release) and release.yml (latest stable).
+# Branch build for the AlwaysStrong packaging line. Every push here produces
+# the three installable zips as workflow artifacts (never a release):
+#   AlwaysStrong.zip           PlayIntegrityFork + TEESimulator-RS
+#   AlwaysStrong-inject.zip    PlayIntegrityFix inject-s + TEESimulator-RS
+#   AlwaysStrong-nopif.zip     PIF-less / Lite + TEESimulator-RS
+#
+# The attestation engine is the MashiroSann/TEESimulator-RS release pinned in
+# build.sh (currently v6.0.1-367, Release-NoEnhanced, arm64-v8a). No engine or
+# WebUI source from that project is vendored here: this branch is the
+# AlwaysStrong module (scripts + automation + WebUI) around that engine.
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [alwaysstrong]
     paths:
-      - 'app/**'
-      - 'native-certgen/**'
       - 'module/**'
-      - 'webui/**'
-      - 'scripts/**'
-      - 'patches/**'
-      - 'stub/**'
-      - 'gradle/**'
-      - '*.gradle.kts'
-      - 'gradlew'
-      - 'gradlew.bat'
-      - 'build-module.ps1'
-      - 'gradle.properties'
-      - '.github/ta-enhanced.json'
+      - 'module-variants/**'
+      - 'attest/**'
+      - 'native/**'
+      - 'banner.png'
+      - 'build.sh'
       - '.github/workflows/build.yml'
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      ref:
-        description: "Git ref to build (defaults to the caller's ref)"
-        type: string
-        required: false
-        default: ''
-    outputs:
-      version:
-        description: "Version parsed from the built release zip (e.g. v6.0.1-312)"
-        value: ${{ jobs.build.outputs.version }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          submodules: "recursive"
           fetch-depth: 0
-          ref: ${{ inputs.ref || github.ref }}
 
-      - name: Setup Java
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: 'gradle'
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zip unzip
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - name: Use committed native binaries (skip the cargo-ndk step in CI)
+        run: find native -path '*/prebuilt/*' -type f -exec touch {} +
 
-      - name: Cache Rust artifacts
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.cargo/bin/cargo-ndk
-            native-certgen/target
-          key: rust-${{ runner.os }}-${{ hashFiles('native-certgen/Cargo.lock') }}
-          restore-keys: rust-${{ runner.os }}-
-
-      - name: Install cargo-ndk
-        run: command -v cargo-ndk || cargo install cargo-ndk
-
-      - name: Set up ccache
-        uses: hendrikmuhs/ccache-action@v1.2.24
-        with:
-          key: ccache-${{ runner.os }}-${{ github.ref_name }}
-          restore-keys: |
-            ccache-${{ runner.os }}-${{ github.ref_name }}
-            ccache-${{ runner.os }}-
-            ccache-
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 'latest'
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 'lts/*'
-          cache: 'pnpm'
-          cache-dependency-path: webui/pnpm-lock.yaml
-
-      - name: Build WebUI
+      - name: Build the three lines
         run: |
-          cd webui
-          pnpm install --frozen-lockfile
-          pnpm run build
+          set -eu
+          tag="$(git rev-list --count HEAD)-$(git rev-parse --short=7 HEAD)-ci"
+          bash build.sh --build-tag "$tag"
 
-      - name: Verify WebUI payload
+      - name: Collect version-less artifact names
         run: |
-          test -f module/webroot/index.html || {
-            echo '::error::module/webroot/index.html missing - WebUI build failed'
-            exit 1
-          }
-          echo "WebUI payload present: $(ls module/webroot | wc -l) entries"
+          set -eu
+          mkdir -p dist
+          for z in out/AlwaysStrong-*.zip; do
+            case "$z" in
+              *-inject.zip) cp "$z" dist/AlwaysStrong-inject.zip ;;
+              *-nopif.zip)  cp "$z" dist/AlwaysStrong-nopif.zip ;;
+              *)            cp "$z" dist/AlwaysStrong.zip ;;
+            esac
+          done
+          ls -la dist
 
-      - name: Ensure Android NDK 27.3
-        run: |
-          NDK="$ANDROID_HOME/ndk/27.3.13750724"
-          if [ ! -d "$NDK" ]; then
-            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.3.13750724" > /dev/null
-          fi
-          test -f "$NDK/source.properties" || { echo '::error::NDK 27.3 unavailable'; exit 1; }
-          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
-
-      - name: Cache TA-enhanced backend
-        uses: actions/cache@v6
+      - name: Upload default build
+        uses: actions/upload-artifact@v4
         with:
-          path: |
-            .cache
-            module/taenh
-          key: tae-${{ runner.os }}-${{ hashFiles('.github/ta-enhanced.json', 'scripts/build-ta-enhanced.py', 'patches/ta-enhanced/*.patch') }}
-          restore-keys: tae-${{ runner.os }}-
+          name: AlwaysStrong
+          path: dist/AlwaysStrong.zip
+          if-no-files-found: error
 
-      - name: Build embedded Tricky Addon Enhanced backend
-        run: python3 scripts/build-ta-enhanced.py
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Build with Gradle
-        run: |
-          chmod +x ./gradlew
-          ./gradlew zipRelease zipDebug zipReleaseNoEnhanced zipDebugNoEnhanced -Porg.gradle.parallel=true -Porg.gradle.vfs.watch=true -Dorg.gradle.jvmargs=-Xmx2048m
-
-      - name: Parse version from release zip
-        id: version
-        run: |
-          release_zip=$(ls out/TEESimulator-RS-*-Release-Enhanced.zip | head -1)
-          base=$(basename "$release_zip" .zip)      # TEESimulator-RS-v6.0.1-312-Release-Enhanced
-          version=${base#TEESimulator-RS-}          # v6.0.1-312-Release-Enhanced
-          version=${version%-Release-Enhanced}      # v6.0.1-312
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Version: $version"
-
-      - name: List build artifacts
-        run: |
-          ls -lh out/*.zip
-
-      - uses: actions/upload-artifact@v7
+      - name: Upload inject build
+        uses: actions/upload-artifact@v4
         with:
-          name: TEESimulator-RS-release-zip
-          path: |
-            out/TEESimulator-RS-*-Release-Enhanced.zip
-            out/TEESimulator-RS-*-Release-NoEnhanced.zip
-          retention-days: 30
-          compression-level: 0
+          name: AlwaysStrong-inject
+          path: dist/AlwaysStrong-inject.zip
+          if-no-files-found: error
 
-      - uses: actions/upload-artifact@v7
+      - name: Upload nopif build
+        uses: actions/upload-artifact@v4
         with:
-          name: TEESimulator-RS-debug-zip
-          path: |
-            out/TEESimulator-RS-*-Debug-Enhanced.zip
-            out/TEESimulator-RS-*-Debug-NoEnhanced.zip
-          retention-days: 7
-          compression-level: 0
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: release-mappings
-          path: app/build/outputs/mapping/release
-          retention-days: 30
-          compression-level: 9
-
-      # Gradle's refreshUpdateJson rewrites the update manifests (module/update.json
-      # for Enhanced, module/update-noenh.json for NoEnhanced) to match the built
-      # version; release.yml commits both back when publishing.
-      - uses: actions/upload-artifact@v7
-        with:
-          name: module-update-json
-          path: |
-            module/update.json
-            module/update-noenh.json
-          retention-days: 30
+          name: AlwaysStrong-nopif
+          path: dist/AlwaysStrong-nopif.zip
+          if-no-files-found: error

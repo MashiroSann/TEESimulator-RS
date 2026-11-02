@@ -1,23 +1,24 @@
-# Build outputs
-.gradle/
-.kotlin/
+# build artifacts
 build/
-app/build/
-stub/build/
-native-certgen/target/
 out/
-local.properties
-app/src/main/jniLibs/
+*.zip
+*.bak
 
-# WebUI (vite)
-webui/node_modules/
-module/webroot/
+# Rust / cargo-ndk per-target build cache (the actual ABI binaries we ship
+# live in native/*/prebuilt/ and ARE committed)
+native/**/target/
 
-# Embedded Tricky Addon Enhanced backend (fetched + built at build time)
-module/taenh/
-.cache/
-
-# IDE
+# OS / editor / tooling cruft (machine-specific, not for sharing)
+.DS_Store
+Thumbs.db
+.vscode/
 .idea/
-*.iml
-__pycache__/
+
+# scratch / temp
+tmp_*
+*.tmp
+*.log
+.aswebui.apk
+
+# upstream-update change summary (regenerated each run by update-upstream.sh)
+.upstream-changes.txt
