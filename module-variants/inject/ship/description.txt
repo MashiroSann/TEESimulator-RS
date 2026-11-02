@@ -1,1 +1,1 @@
-Strong Play Integrity in one drop-in module. Hardware attestation + a Pixel fingerprint kept fresh automatically.
+Strong Play Integrity in one drop-in module. TEESimulator-RS (MashiroSann fork) + PlayIntegrityFix inject-s, auto-refreshed. Tap Action.
